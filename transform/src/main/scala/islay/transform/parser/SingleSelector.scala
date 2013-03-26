@@ -3,7 +3,7 @@ package islay.transform.parser
 import scala.concurrent.{ExecutionContext, Future}
 import scala.xml.{Elem, NodeSeq, Text}
 
-import islay.transform.Transformation
+import islay.transform.TransformFunction
 
 
 object Selectors {
@@ -23,7 +23,7 @@ case class SingleSelector(sequence: Seq[SimpleSelector], chain: Option[(Combinat
   def sequenceMatches(node: Elem, parent: Elem, index: Int) = sequence.forall(_.matches(node, parent, index))
 
 
-  def apply(node: Elem, parent: Elem, index: Int, f: Transformation)
+  def apply(node: Elem, parent: Elem, index: Int, f: TransformFunction)
     (implicit executor: ExecutionContext): List[NodeReplacement] = {
 
     if (sequenceMatches(node, parent, index)) {

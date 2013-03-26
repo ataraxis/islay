@@ -10,7 +10,7 @@ import islay.transform.{Selector, SelectorImpl}
 
 package object transform {
 
-  type Transformation = Elem => Future[NodeSeq]
+  type TransformFunction = Elem => Future[NodeSeq]
 
 
   implicit class SelectorContext(val sc: StringContext) {

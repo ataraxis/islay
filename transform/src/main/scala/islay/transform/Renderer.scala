@@ -57,7 +57,6 @@ object Renderer {
 //  }
 
   implicit def traversableRenderer[A](implicit delegate: Renderer[A]): Renderer[Traversable[A]] = {
-    println("delegate = "+ delegate)
     new Renderer[Traversable[A]] {
       override def toNodeSeq(value: Traversable[A]): Future[NodeSeq] = {
         import CallingThreadExecutor.Implicit

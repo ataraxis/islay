@@ -21,25 +21,12 @@ class SelectorTest extends FunSuite with ShouldMatchers {
 
   test("** replaces children") {
 
-    var transform: Transform = null
-//    transform = universalSelector ** List(42, "foo")
-    transform = universalSelector ** List(<foo></foo><bar/>, <bar/>)
-//    transform = universalSelector ** <foo></foo><bar/><bar/>;
-//    transform = universalSelector ** <foo/>
-    transform = universalSelector ** Future(Seq(<foo/>).flatten)
-
-//    val transform = universalSelector ** List(<foo></foo><bar/>, <bar/>);
-//    val f = transform(<foo>Bar<bar>Baz</bar></foo>)
-//    val result = Await.result(f, 2.seconds)
-//    println(result)
-
-//    val transform = universalSelector ** List(Future(Some(42)))
+    val transform = universalSelector ** List(Future(Some(42)))
     val f = transform(<foo>Bar<bar>Baz</bar></foo>)
     val result = Await.result(f, 2.seconds)
-    println("result = "+result)
-//
-//    result(0).label should be ("foo")
-//    result(0).text should be ("42")
+
+    result(0).label should be ("foo")
+    result(0).text should be ("42")
   }
 
   test("<> replaces elements with renderable") {
@@ -54,11 +41,11 @@ class SelectorTest extends FunSuite with ShouldMatchers {
 
   test("<> replaces elements with all renderables in a list") {
 
-    val transform = pSelector <> List("", "")
+    val transform = pSelector <> List("Bo", "ff")
     val f = transform(<div>Foo<p>Bar</p>Baz</div>)
     val result = Await.result(f, 2.seconds)
 
     result(0).label should be ("div")
-    result(0).text should be ("Foo, Baz")
+    result(0).text should be ("FooBoffBaz")
   }
 }

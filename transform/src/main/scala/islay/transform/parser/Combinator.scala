@@ -5,7 +5,7 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.xml.Elem
 
 import Selectors.NodeReplacement
-import islay.transform.{CallingThreadExecutor, Transformation}
+import islay.transform.{CallingThreadExecutor, TransformFunction}
 
 
 sealed abstract class Combinator {
@@ -14,11 +14,11 @@ sealed abstract class Combinator {
    * Applies the given selector (following its chain if it has one) to the given node and returns the replacements
    * that should be applied to parent (in order of descending index).
    */
-  def apply(node: Elem, parent: Elem, index: Int, selector: SingleSelector, f: Transformation)
+  def apply(node: Elem, parent: Elem, index: Int, selector: SingleSelector, f: TransformFunction)
     (implicit executor: ExecutionContext): List[NodeReplacement] = ???
 
 
-  protected def applyToChildren(node: Elem, selector: SingleSelector, f: Transformation)
+  protected def applyToChildren(node: Elem, selector: SingleSelector, f: TransformFunction)
       (implicit executor: ExecutionContext): Option[Future[Elem]] = {
 
     val children = node.child
@@ -73,7 +73,7 @@ object Combinator {
    */
   case object Descendant extends Combinator {
 
-    override def apply(cursor: Elem, parent: Elem, index: Int, selector: SingleSelector, f: Transformation)
+    override def apply(cursor: Elem, parent: Elem, index: Int, selector: SingleSelector, f: TransformFunction)
         (implicit executor: ExecutionContext): List[NodeReplacement] = {
       apply(cursor, selector, f) match {
         case Some(updated) => List((updated, index))
@@ -81,20 +81,20 @@ object Combinator {
       }
     }
 
-    def apply(node: Elem, selector: SingleSelector, f: Transformation)
+    def apply(node: Elem, selector: SingleSelector, f: TransformFunction)
         (implicit executor: ExecutionContext): Option[Future[Elem]] = {
 
-      applyToChildren(node, selector, f) map {
+      descendChildren(node, selector, f) map {
         import CallingThreadExecutor.Implicit
         _ flatMap { newNode =>
-          descendChildren(newNode, selector, f)(executor) getOrElse Future.successful(newNode)
+          applyToChildren(newNode, selector, f)(executor) getOrElse Future.successful(newNode)
         }
       } orElse {
-        descendChildren(node, selector, f)
+        applyToChildren(node, selector, f)
       }
     }
 
-    def descendChildren(node: Elem, selector: SingleSelector, f: Transformation)
+    def descendChildren(node: Elem, selector: SingleSelector, f: TransformFunction)
         (implicit executor: ExecutionContext): Option[Future[Elem]] = {
 
       val children = node.child
@@ -125,7 +125,7 @@ object Combinator {
    */
   case object Child extends Combinator {
 
-    override def apply(cursor: Elem, parent: Elem, index: Int, selector: SingleSelector, f: Transformation)
+    override def apply(cursor: Elem, parent: Elem, index: Int, selector: SingleSelector, f: TransformFunction)
         (implicit executor: ExecutionContext): List[NodeReplacement] = {
 
       applyToChildren(cursor, selector, f) match {
@@ -140,7 +140,7 @@ object Combinator {
    */
   case object AdjacentSibling extends Combinator {
 
-    override def apply(node: Elem, parent: Elem, index: Int, selector: SingleSelector, f: Transformation)
+    override def apply(node: Elem, parent: Elem, index: Int, selector: SingleSelector, f: TransformFunction)
         (implicit executor: ExecutionContext): List[NodeReplacement] = {
 
       val siblings = parent.child
@@ -167,7 +167,7 @@ object Combinator {
    */
   case object GeneralSibling extends Combinator {
 
-    override def apply(node: Elem, parent: Elem, index: Int, selector: SingleSelector, f: Transformation)
+    override def apply(node: Elem, parent: Elem, index: Int, selector: SingleSelector, f: TransformFunction)
         (implicit executor: ExecutionContext): List[NodeReplacement] = {
 
       val siblings = parent.child

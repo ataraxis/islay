@@ -20,7 +20,7 @@ case class Selector(private val groups: Seq[SingleSelector]) {
    * Applies a transformation function to the elements matched by this selector against a given `NodeSeq`, returning
    * an updated `NodeSeq`.
    */
-  def apply(nodes: NodeSeq)(f: Transformation)
+  def apply(nodes: NodeSeq)(f: TransformFunction)
       (implicit executor: ExecutionContext): Future[NodeSeq] = {
 
     groups.foldLeft(Future successful nodes) { (acc, selector) =>
@@ -35,7 +35,7 @@ case class Selector(private val groups: Seq[SingleSelector]) {
   def transform(f: Elem => NodeSeq)(implicit executor: ExecutionContext): Transform =
     futureTransform(f andThen Future.successful)
 
-  def futureTransform(f: Transformation)(implicit executor: ExecutionContext): Transform =
+  def futureTransform(f: TransformFunction)(implicit executor: ExecutionContext): Transform =
     new Transform(
       operation = ns => apply(ns)(f)
     )
@@ -43,7 +43,7 @@ case class Selector(private val groups: Seq[SingleSelector]) {
   private def innerTransform(f: Elem => NodeSeq) =
     transform(f)(CallingThreadExecutor)
 
-  private def innerFutureTransform(f: Transformation) =
+  private def innerFutureTransform(f: TransformFunction) =
     futureTransform(f)(CallingThreadExecutor)
 
   /**

@@ -1,9 +1,8 @@
 package islay.transform
 
-import scala.xml.NodeSeq
-import scala.xml.Elem
-import scala.concurrent.Future
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{Await, Future}
+import scala.concurrent.duration.Duration
+import scala.xml.{Elem, NodeSeq}
 
 
 class Transform(
@@ -16,11 +15,16 @@ class Transform(
       case None => Future.successful(elem)
       case Some(t) => t.bindTo(elem)
     }
-    println("elem = "+elem)
     newNodes.flatMap(operation)(CallingThreadExecutor)
   }
 
   def apply(elem: Elem) = bindTo(elem)
+
+  /**
+   * For easy currying to `NodeSeq => NodeSeq`.
+   */
+  def synchronousApply(atMost: Duration)(elem: Elem): NodeSeq =
+    Await.result(apply(elem), atMost)
 
   def &(next: Transform): Transform =
     new Transform(previous = Some(Transform.this), operation = next.operation)

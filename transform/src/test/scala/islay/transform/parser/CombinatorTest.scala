@@ -96,6 +96,25 @@ class CombinatorTest extends FunSuite with ShouldMatchers {
     (element("div", "g") \ "@class")(0) should equal (Text("smack"))
   }
 
+  test("Descendant combinator doesn't descend added elements") {
+
+    val spanSelector = SingleSelector(TypeSelector("span") :: Nil, None)
+    val idSelector = SingleSelector(
+      IdSelector("a") :: Nil,
+      Some((Descendant, spanSelector))
+    )
+    val selector = Selector(idSelector :: Nil)
+
+    def transformation(elem: Elem): NodeSeq =
+      elem.copy(child = elem.child ++ <span/>)
+
+    val transform = selector.transform(transformation)
+    implicit val result = Await.result(transform(xml), 3.seconds)
+
+    element("span", "h").toSeq(0).child(1).label should equal ("span")
+    element("span", "h").toSeq(0).child(1).child should have length (0)
+  }
+
   test("Adjacent sibling combinator applies only to the immediate sibling") {
 
     val pSelector = SingleSelector(TypeSelector("p") :: Nil, None)
