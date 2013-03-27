@@ -75,11 +75,6 @@ case class Selector(private val groups: Seq[SingleSelector]) {
     }
   }
 
-  def **(content: Node): Transform = ???
-  /* XXX: this method exists to work around the diverging implicit expansion that occurs doing: `t ** <foo/>` */
-
-//  def **(content: Traversable[NodeSeq]): Transform = ???
-
   /**
    * Defines a [[islay.transform.Transform]] that _binds_ the supplied content to every element matched by this
    * selector. The content may be an instance of [[islay.transform.Bindable]], in which case it implements a
@@ -104,8 +99,14 @@ case class Selector(private val groups: Seq[SingleSelector]) {
     }
   }
 
+  /**
+   * Defines a [[islay.transform.Transform]] that removes every matched element and all of their descendants.
+   */
   def remove: Transform = innerTransform(_ => NodeSeq.Empty)
 
+  /**
+   * Defines a [[islay.transform.Transform]] that removes all descendants of every matched element.
+   */
   def empty: Transform = innerTransform(_.copy(child = Nil))
 
   /**
@@ -161,4 +162,6 @@ case class Selector(private val groups: Seq[SingleSelector]) {
   def wrapInner(elem: Elem): Transform = ???
 
   def unwrap: Transform = ???
+
+  def flatten: Transform = innerTransform(_.child)
 }

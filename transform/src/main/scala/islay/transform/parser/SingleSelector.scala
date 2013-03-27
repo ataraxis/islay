@@ -114,7 +114,9 @@ case class Negation(sequence: Seq[SimpleSelector]) extends PseudoClass
 sealed abstract class StructuralValue extends PseudoClass
 
 object StructuralValue {
-  case object Root extends StructuralValue
+  case object Root extends StructuralValue {
+    override def matches(node: Elem, parent: Elem, index: Int) = parent.isInstanceOf[islay.transform.GodNode]
+  }
   case object FirstChild extends StructuralValue
   case object LastChild extends StructuralValue
   case object FirstOfType extends StructuralValue

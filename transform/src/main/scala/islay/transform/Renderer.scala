@@ -22,10 +22,18 @@ object Renderer {
     override def toNodeSeq(value: CharSequence): Future[NodeSeq] = Future successful Text(value.toString)
   }
 
-  implicit object NodeSeqRenderer extends Renderer[NodeSeq] {
-    override def toNodeSeq(value: NodeSeq): Future[NodeSeq] = Future(value)(CallingThreadExecutor)
-  }
+//  implicit object NodeSeqRenderer extends Renderer[NodeSeq] {
+//    override def toNodeSeq(value: NodeSeq): Future[NodeSeq] = Future successful value
+//  }
+//
+//  implicit object NodeBufferRenderer extends Renderer[NodeBuffer] {
+//    override def toNodeSeq(value: NodeBuffer): Future[NodeSeq] = Future successful NodeSeq.fromSeq(value)
+//  }
 
+  /* Seq[Node] is the common superclass of NodeBuffer and NodeSeq. */
+  implicit object SeqNodeRenderer extends Renderer[Seq[Node]] {
+    override def toNodeSeq(value: Seq[Node]): Future[NodeSeq] = Future successful value
+  }
 //  implicit object NodeRenderer extends Renderer[Node] {
 //    override def toNodeSeq(value: Node): Future[NodeSeq] = Future successful value
 //  }
@@ -45,10 +53,9 @@ object Renderer {
         value.fold(Future successful NodeSeq.Empty)(delegate.toNodeSeq)
     }
 
-//  implicit def linearSeqRenderer[A](implicit delegate: Renderer[A]): Renderer[LinearSeq[A]] = {
-//    println("delegate = "+ delegate)
-//    new Renderer[LinearSeq[A]] {
-//      override def toNodeSeq(value: LinearSeq[A]): Future[NodeSeq] = {
+//  implicit def traversableRenderer[A](implicit delegate: Renderer[A]): Renderer[Traversable[A]] = {
+//    new Renderer[Traversable[A]] {
+//      override def toNodeSeq(value: Traversable[A]): Future[NodeSeq] = {
 //        import CallingThreadExecutor.Implicit
 //        val seq = value.toIndexedSeq.map(delegate.toNodeSeq)
 //        Future.sequence(seq).map(_.flatten)
@@ -56,9 +63,10 @@ object Renderer {
 //    }
 //  }
 
-  implicit def traversableRenderer[A](implicit delegate: Renderer[A]): Renderer[Traversable[A]] = {
-    new Renderer[Traversable[A]] {
-      override def toNodeSeq(value: Traversable[A]): Future[NodeSeq] = {
+  /* can't be more general than LinearSeq without creating ambiguous implicits for Node */
+  implicit def linearSeqRenderer[A](implicit delegate: Renderer[A]): Renderer[LinearSeq[A]] = {
+    new Renderer[LinearSeq[A]] {
+      override def toNodeSeq(value: LinearSeq[A]): Future[NodeSeq] = {
         import CallingThreadExecutor.Implicit
         val seq = value.toIndexedSeq.map(delegate.toNodeSeq)
         Future.sequence(seq).map(_.flatten)
