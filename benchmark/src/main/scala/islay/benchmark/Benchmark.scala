@@ -37,20 +37,29 @@ class Benchmark extends SimpleScalaBenchmark {
               <p id="l">Niagra Falls</p>
             </div>
 
-  val duration = 100.millis
+  val duration = 500.millis
 
-  val childSelector = c"div > span"
-  val childTransform = childSelector ** "foo"
+  val childTransform = c"div > span" ** "foo"
+
+  val deepTransform = c"*".addAttr("class", "smack")
+  val deepXml =
+    Range(1, 100).foldLeft(<div/>) { (child, _) =>
+      <div/>.copy(child = child)
+    }
 
   override def setUp() {
     // set up all your benchmark data here
   }
 
   def timeChildSelector(reps: Int) = repeat(reps) {
-    val future = childTransform.apply(xml)
+    val future = childTransform(xml)
     Await.result(future, duration)
   }
 
+  def timeDeepReplace(reps: Int) = repeat(reps) {
+    val future = deepTransform(xml)
+    Await.result(future, duration)
+  }
 
   override def tearDown() {
     // clean up after yourself if required
