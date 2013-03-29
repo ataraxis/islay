@@ -31,6 +31,6 @@ class TransformTest extends FunSuite {
     val f = selector.addAttr("class", "smack") apply (xml)
 
     val result = Await.result(f, 4.seconds)
-    println(result)
+//    println(result)
   }
 }

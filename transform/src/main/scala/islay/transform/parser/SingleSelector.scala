@@ -13,8 +13,8 @@ object Selectors {
 import Selectors._
 
 /**
- * A single selector in a comma-separated group of selectors. For convenience, the group of selectors is just
- * [[islay.transform.Selector]].
+ * A single selector in a comma-separated group of selectors. For convenience, the group of
+ * selectors is just [[islay.transform.Selector]].
  */
 case class SingleSelector(sequence: Seq[SimpleSelector], chain: Option[(Combinator, SingleSelector)]) {
 

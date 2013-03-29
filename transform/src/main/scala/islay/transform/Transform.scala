@@ -8,8 +8,8 @@ import scala.xml.{Elem, NodeSeq}
 object Transform {
 
   /**
-   * A transformation that returns the original element unmodified when applied. This is useful when a value is needed
-   * to complete an expression, though `when()` can often be used instead.
+   * A transformation that returns the original element unmodified when applied. This is useful
+   * when a value is needed to complete an expression, though `when()` can often be used instead.
    */
   val Noop = new Transform(operation = Future.successful)
 }
@@ -36,15 +36,15 @@ class Transform(
     Await.result(apply(elem), atMost)
 
   /**
-   * Compose this with another `Transform`. This transform will be applied first and the resulting `NodeSeq` will be
-   * applied to the next transform.
+   * Compose this with another `Transform`. This transform will be applied first and the resulting
+   * `NodeSeq` will be applied to the next transform.
    */
   def &(next: Transform): Transform =
     new Transform(previous = Some(this), operation = next.operation)
 
   /**
-   * Returns a no-op transformation if the given condition is `false`, or returns itself if the condition is
-   * `true`. For example:
+   * Returns a no-op transformation if the given condition is `false`, or returns itself if the
+   * condition is `true`. For example:
    *
    * {{{
    * c"a".flatten when (!userHasEditPermissions)
