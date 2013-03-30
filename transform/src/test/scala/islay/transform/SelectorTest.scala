@@ -1,15 +1,13 @@
 package islay.transform
 
-import java.util.concurrent.Executors
-import scala.concurrent.{Await, ExecutionContext, Future}
-import scala.concurrent.duration._
-import scala.xml.{Attribute, Null, Text}
+import scala.concurrent.{Await, Future}
+import scala.concurrent.duration.DurationInt
+import scala.xml.Text
+
 import org.scalatest.FunSuite
-import islay.transform.parser.{SingleSelector, UniversalSelector}
 import org.scalatest.matchers.ShouldMatchers
-import islay.transform.parser.TypeSelector
-import scala.xml.NodeSeq
-import islay.transform.parser.StructuralValue
+
+import islay.transform.parser._
 
 
 class SelectorTest extends FunSuite with ShouldMatchers {
@@ -40,9 +38,31 @@ class SelectorTest extends FunSuite with ShouldMatchers {
     result(0).child should have length (0)
   }
 
+  test("** replaces children with all renderables in a list") {
+
+    val transform = universalSelector ** Some(Seq(Text("biff"), <boff/>))
+    val f = transform(<foo>Bar<bar>Baz</bar></foo>)
+    val result = Await.result(f, 2.seconds)
+
+    result(0).label should be ("foo")
+    result(0).child(0).text should equal ("biff")
+    result(0).child(1).label should be ("boff")
+  }
+
+  test("** can replace children with a NodeBuffer") {
+
+    val transform = universalSelector ** Future(<biff/><boff/>)
+    val f = transform(<foo>Bar<bar>Baz</bar></foo>)
+    val result = Await.result(f, 2.seconds)
+
+    result(0).label should be ("foo")
+    result(0).child(0).label should equal ("biff")
+    result(0).child(1).label should be ("boff")
+  }
+
   test("<> replaces elements with renderable") {
 
-    val transform = pSelector <> List(Future(Some(", ")))
+    val transform = pSelector <> Seq(Future(Some(", ")))
     val f = transform(<div>Foo<p>Bar</p>Baz</div>)
     val result = Await.result(f, 2.seconds)
 
