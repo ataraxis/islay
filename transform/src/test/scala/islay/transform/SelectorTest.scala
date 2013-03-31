@@ -111,6 +111,18 @@ class SelectorTest extends FunSuite with ShouldMatchers {
 
     result(0).label should be ("div")
     result(0).text should be ("FooBaz")
+    result(0).child(1) should equal (Text("Baz"))
+  }
+
+  test("`empty` removes an element's descendants") {
+
+    val transform = pSelector.empty
+    val f = transform(<div>Foo<p>Bar<baz>Bux</baz></p>Baz</div>)
+    val result = Await.result(f, 2.seconds)
+
+    result(0).label should be ("div")
+    result(0).text should be ("FooBaz")
+    result(0).child(1).label should be ("p")
   }
 
   test("`addAttr` replaces an existing attribute on a matched element") {
@@ -204,5 +216,41 @@ class SelectorTest extends FunSuite with ShouldMatchers {
     result(0).child(0).label should be ("span")
     result(0).child(1) should equal (Text("10.0"))
     result(0).child(2) should equal (Text("7.1"))
+  }
+
+  test("`wrap` wraps a matched element with a nested structure") {
+
+    val transform = pSelector.wrap(<div><a/>Qux</div>)
+    val f = transform(<div>Foo<p/>Bar</div>)
+    val result = Await.result(f, 2.seconds)
+
+    result(0).text should equal ("FooQuxBar")
+    result(0).child(1).label should be ("div")
+    result(0).child(1).child(0).label should be ("a")
+    result(0).child(1).child(0).child(0).label should be ("p")
+  }
+
+  test("`wrapInner` wraps the content of a matched element with a nested structure") {
+
+    val transform = pSelector.wrapInner(<div><a/>Qux</div>)
+    val f = transform(<p>Foo<span/>Bar</p>)
+    val result = Await.result(f, 2.seconds)
+
+    result(0).text should equal ("FooBarQux")
+    result(0).child(0).label should be ("div")
+    result(0).child(0).child(0).label should be ("a")
+    result(0).child(0).child(0).child(1).label should be ("span")
+  }
+
+  test("`flatten` removes an element while preserving its children") {
+
+    val transform = pSelector.flatten
+    val f = transform(<div>Foo<p>Bar<a/></p></div>)
+    val result = Await.result(f, 2.seconds)
+
+    result(0).text should equal ("FooBar")
+    result(0).child(0) should equal (Text("Foo"))
+    result(0).child(1) should equal (Text("Bar"))
+    result(0).child(2).label should be ("a")
   }
 }

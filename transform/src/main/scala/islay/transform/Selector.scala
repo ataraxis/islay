@@ -103,13 +103,14 @@ case class Selector(private val groups: Seq[SingleSelector]) {
   }
 
   /**
-   * Defines a [[islay.transform.Transform]] that removes every matched element and all of their
-   * descendants.
+   * Defines a [[islay.transform.Transform]] that removes every element matched by this selector
+   * and all of its descendants.
    */
   def remove: Transform = innerTransform(_ => NodeSeq.Empty)
 
   /**
-   * Defines a [[islay.transform.Transform]] that removes all descendants of every matched element.
+   * Defines a [[islay.transform.Transform]] that removes all descendants of every element matched
+   * by this selector.
    */
   def empty: Transform = innerTransform(_.copy(child = Nil))
 
@@ -222,9 +223,30 @@ case class Selector(private val groups: Seq[SingleSelector]) {
     wrap(wrapper)
   }
 
-  def wrapInner(elem: Elem): Transform = ???
+  /**
+   * Defines a [[islay.transform.Transform]] that wraps an XML structure around the child elements
+   * of every element matched by this selector. The structure may be nested, in which case the
+   * children are placed at the bottom of this structure.
+   *
+   * The precise wrapping behavior matches that of jQuery's
+   * [[http://api.jquery.com/wrapInner/#wrapInner-wrappingElement wrapInner()]] method.
+   */
+  def wrapInner(wrapper: Elem): Transform = innerTransform { elem =>
 
-  def unwrap: Transform = ???
+    def wrap(wrapper: Elem): Elem = {
+      wrapper.child match {
+        case (head: Elem) +: tail =>
+          wrapper.copy(child = wrap(head) +: tail)
+        case _ =>
+          wrapper.copy(child = wrapper.child ++ elem.child)
+      }
+    }
+    elem.copy(child = wrap(wrapper))
+  }
 
+  /**
+   * Defines a [[islay.transform.Transform]] that substitutes every element matched by this
+   * selector with its children.
+   */
   def flatten: Transform = innerTransform(_.child)
 }
