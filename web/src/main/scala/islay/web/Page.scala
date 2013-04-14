@@ -1,16 +1,6 @@
 package islay.web
 
-import islay.transform.Transform
-import spray.routing.RequestContext
-import spray.routing.Route
+import islay.template.{TemplateBinding, TemplateProcessor}
 
 
-trait Page extends Route {
-
-  def transform: Transform
-
-  override def apply(context: RequestContext) {
-    // apply transformation
-    // complete response
-  }
-}
+abstract class Page(override implicit val processor: TemplateProcessor) extends TemplateBinding

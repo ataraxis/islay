@@ -19,21 +19,21 @@ class Transform(
     private val operation: NodeSeq => Future[NodeSeq]
 ) extends Bindable {
 
-  override def bindTo(elem: Elem): Future[NodeSeq] = {
+  override def bindTo(elem: Elem): Future[NodeSeq] = apply(elem)
+
+  def apply(nodes: NodeSeq): Future[NodeSeq] = {
     val newNodes = previous match {
-      case None => Future.successful(elem)
-      case Some(t) => t.bindTo(elem)
+      case None => Future.successful(nodes)
+      case Some(t) => t.apply(nodes)
     }
     newNodes.flatMap(operation)(CallingThreadExecutor)
   }
 
-  def apply(elem: Elem) = bindTo(elem)
-
   /**
    * For easy currying to `NodeSeq => NodeSeq`.
    */
-  def synchronousApply(atMost: Duration)(elem: Elem): NodeSeq =
-    Await.result(apply(elem), atMost)
+  def synchronousApply(atMost: Duration)(nodes: NodeSeq): NodeSeq =
+    Await.result(apply(nodes), atMost)
 
   /**
    * Compose this with another `Transform`. This transform will be applied first and the resulting

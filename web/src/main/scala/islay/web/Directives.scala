@@ -1,10 +1,9 @@
 package islay.web
 
-import spray.routing._
-import spray.routing.directives._
-import spray.http.HttpHeader
-
 import shapeless._
+import spray.http.HttpHeader
+import spray.routing.{Directive, Directive0, RequestContext}
+import spray.routing.directives._
 
 
 object WebHeaders {
@@ -25,15 +24,20 @@ object WebHeaders {
 }
 
 trait Directives {
-  import RespondWithDirectives._
+  import BasicDirectives._
   import MiscDirectives._
+  import RespondWithDirectives._
   import WebHeaders._
 
   def refresh(url: String): Directive0 = refresh(0, url)
 
   def refresh(timeout: Int, url: String): Directive0 = respondWithHeader(Refresh(timeout, url))
 
-  def replacePath(path: String): Directive0 = rewriteUnmatchedPath(_ => path)
+  def rewritePath(path: String): Directive0 = mapRequestContext { ctx =>
+    val q = ctx.request.rawQuery
+    val uri = if (q.isEmpty) path else path + "?" + q
+    RequestContext(ctx.request.copy(uri = uri).parseUri, ctx.responder, path)
+  }
 
   def flash(content: String): Directive0
 

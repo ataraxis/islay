@@ -10,7 +10,7 @@ object Build extends Build {
     id = "islay",
     base = file("."),
     settings = rootSettings,
-    aggregate = Seq(transform, web)
+    aggregate = Seq(transform, template, web)
   ).settings( Defaults.itSettings : _*)
 
   lazy val transform = Project(
@@ -19,11 +19,18 @@ object Build extends Build {
     settings = transformSettings
   ).settings( libraryDependencies <+= scalaVersion("org.scala-lang" % "scala-compiler" % _) )
 
+  lazy val template = Project(
+    id = "template",
+    base = file("template"),
+    settings = templateSettings,
+    dependencies = Seq(transform)
+  )
+
   lazy val web = Project(
     id = "web",
     base = file("web"),
     settings = webSettings,
-    dependencies = Seq(transform)
+    dependencies = Seq(transform, template)
   )
 
   lazy val benchmark = Project(
@@ -69,6 +76,12 @@ object Settings {
     scalacOptions in (Compile, console) += "-Yreify-copypaste"
   )
 
+  lazy val templateSettings = defaultSettings ++ Seq(
+    libraryDependencies ++=
+      Dependencies.template ++
+      Dependencies.templateTestkit
+  )
+
   lazy val webSettings = defaultSettings ++ Seq(
     libraryDependencies ++=
       Dependencies.web ++
@@ -94,6 +107,13 @@ object Dependencies {
 
   val transform = Seq(Compile.parboiled)
   val transformTestkit = baseTestkit
+
+  val template = Seq(
+    Compile.akkaActor,
+    Compile.htmlParser,
+    Compile.sprayRouting
+  )
+  val templateTestkit = baseTestkit ++ Seq(Test.akkaTestkit)
 
   val web = Seq(
     Compile.akkaActor,
