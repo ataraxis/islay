@@ -1,7 +1,5 @@
 package islay.template
 
-import islay.transform.CallingThreadExecutor
-
 import java.io.FileNotFoundException
 import java.nio.file.{Files, Path}
 
@@ -10,19 +8,21 @@ import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.util.{Failure, Success}
 import scala.xml.{Comment, Elem, NodeSeq}
 
-import akka.actor.{ActorRef, Status}
+import akka.actor._
 import akka.spray.UnregisteredActorRef
-import spray.http.{EmptyEntity, HttpMethods, HttpProtocols, HttpRequest}
+import islay.transform.CallingThreadExecutor
+import spray.http.{EmptyEntity, HttpMethods, HttpProtocols, HttpRequest, HttpResponse}
 import spray.routing.{RequestContext, Route}
 
 
 case class TemplateProcessor(
-  route: Route = ???,
+  route: Route = null,
   root: Path = Resources.pathTo("webapp"),
-  formatter: Formatter = ???,
-  parsers: Map[String, Parser] = Map("html" -> ???)
+  formatter: Formatter = null,
+  parsers: Map[String, Parser] = Map("html" -> new Html5Parser)
 ) {
 
+  implicit val self = this
 
   private val cache = "TODO"
 
@@ -38,6 +38,7 @@ case class TemplateProcessor(
    * @throws FileNotFoundException inside a [[scala.util.Failure]] if the resource cannot be found
    */
   def lookup(request: HttpRequest): Future[NodeSeq] = {
+    /* TODO: get execution context from somewhere */
     import ExecutionContext.Implicits.global
 
     val exactPath = Resources.resolve(root, request.path)
@@ -71,7 +72,7 @@ case class TemplateProcessor(
     }
   }
 
-  type NodeReplacement = (Future[NodeSeq], Int)
+  private type NodeReplacement = (Future[NodeSeq], Int)
 
   /**
    * Recursively applies any SSI templates using the `route` this processor was constructed with to
@@ -136,16 +137,7 @@ case class TemplateProcessor(
     ).parseUri
 
     val promise = Promise[NodeSeq]
-    val responder = new UnregisteredActorRef(context.responder) {
-      override def handle(message: Any)(implicit sender: ActorRef) {
-        message match {
-          case nodes: NodeSeq =>
-            promise.complete(Success(nodes))
-          case Status.Failure(ex) =>
-            promise.complete(Failure(ex))
-        }
-      }
-    }
+    val responder = new TemplateResponder(promise, context.responder)
 
     val templateContext = RequestContext(templateRequest, responder, templateRequest.path)
     route(templateContext)
@@ -157,4 +149,23 @@ case class TemplateProcessor(
 
   private def ssiUri(comment: Comment): Option[String] =
     ssiRegex findFirstMatchIn comment.commentText map (_ group 1)
+
+
+  def format(nodes: NodeSeq): HttpResponse = {
+    ???
+  }
+}
+
+
+private[islay] class TemplateResponder(promise: Promise[NodeSeq], delegate: ActorRef)
+extends UnregisteredActorRef(delegate) {
+
+  override def handle(message: Any)(implicit sender: ActorRef) {
+    message match {
+      case nodes: NodeSeq =>
+        promise.complete(Success(nodes))
+      case Status.Failure(ex) =>
+        promise.complete(Failure(ex))
+    }
+  }
 }

@@ -11,16 +11,24 @@ import spray.routing.{Directive, RequestContext, Route}
 
 trait TemplateDirectives {
 
-  def completeTemplate(nodes: NodeSeq): Route = completeTemplate(nodes, _)
+  def completeTemplate(nodes: NodeSeq)(implicit processor: TemplateProcessor): Route = completeTemplate(nodes, _)
 
-  def completeTemplate(nodes: NodeSeq, ctx: RequestContext) {
-    ctx.responder ! nodes
+  def completeTemplate(nodes: NodeSeq, ctx: RequestContext)(implicit processor: TemplateProcessor) {
+    ctx.responder match {
+      case r: TemplateResponder => r ! nodes
+      case r => r ! processor.format(nodes)
+    }
   }
 
-  def completeTemplate(future: Future[NodeSeq])(implicit executor: ExecutionContext): Route = { ctx =>
+  def completeTemplate(future: Future[NodeSeq])
+      (implicit executor: ExecutionContext, processor: TemplateProcessor): Route = completeTemplate(future, _)
+
+  def completeTemplate(future: Future[NodeSeq], ctx: RequestContext)
+      (implicit executor: ExecutionContext, processor: TemplateProcessor) {
     future onComplete {
-      case Success(nodes) => ctx.responder ! nodes
+      case Success(nodes) => completeTemplate(nodes, ctx)
       case Failure(ex) => ctx.failWith(ex)
+      case m => ctx.failWith(new Exception("Invalid template completion: "+ m))
     }
   }
 
