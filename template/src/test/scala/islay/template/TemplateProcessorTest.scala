@@ -12,9 +12,9 @@ import org.scalatest.matchers.ShouldMatchers
 import akka.actor._
 import akka.testkit.{ImplicitSender, TestKit}
 import spray.http.HttpRequest
-import spray.routing.Directive.pimpApply
-import spray.routing.RequestContext
-import spray.routing.directives.{PathDirectives, RouteDirectives}
+import spray.routing.Directive._
+import spray.routing._
+import spray.routing.directives._
 
 
 class TemplateProcessorTest extends TestKit(ActorSystem("test")) with ImplicitSender
@@ -26,9 +26,8 @@ with RouteDirectives with PathDirectives with TemplateDirectives {
     override def parseFragment(bytes: Array[Byte]) = content
   }
 
-  def newProcessor = new TemplateProcessor(
-    parsers = Map("html" -> stubParser(<html/>))
-  ) {
+  def newProcessor = new TemplateProcessor {
+    override val parsers = Map("html" -> stubParser(<html/>))
     override val route = completeTemplate(<buffalo/>)
   }
 

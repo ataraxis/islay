@@ -4,27 +4,39 @@ import java.io.FileNotFoundException
 import java.nio.file.{Files, Path}
 
 import scala.annotation.tailrec
-import scala.concurrent.{ExecutionContext, Future, Promise}
+import scala.concurrent.{Future, Promise}
+import scala.concurrent.ExecutionContext
 import scala.util.{Failure, Success}
 import scala.xml.{Comment, Elem, NodeSeq}
+import scala.xml.NodeSeq.seqToNodeSeq
 
 import akka.actor._
 import akka.spray.UnregisteredActorRef
 import islay.transform.CallingThreadExecutor
-import spray.http.{EmptyEntity, HttpMethods, HttpProtocols, HttpRequest, HttpResponse}
+import spray.http.{EmptyEntity, HttpBody, HttpMethods, HttpProtocols, HttpRequest, HttpResponse}
 import spray.routing.{RequestContext, Route}
 
 
 case class TemplateProcessor(
-  route: Route = null,
   root: Path = Resources.pathTo("webapp"),
-  formatter: Formatter = null,
+  formatter: Formatter = new Html5Formatter,
   parsers: Map[String, Parser] = Map("html" -> new Html5Parser)
 ) {
 
   implicit val self = this
 
   private val cache = "TODO"
+
+  import TemplateDirectives._
+
+  def route: Route = { context =>
+    /* TODO: get execution context from somewhere */
+    import ExecutionContext.Implicits.global
+    for {
+      nodes <- lookup(context.request)
+      expanded <- expand(nodes, context)
+    } completeTemplate(expanded, context)
+  }
 
 
   /**
@@ -151,9 +163,8 @@ case class TemplateProcessor(
     ssiRegex findFirstMatchIn comment.commentText map (_ group 1)
 
 
-  def format(nodes: NodeSeq): HttpResponse = {
-    ???
-  }
+  def format(nodes: NodeSeq): HttpResponse =
+    HttpResponse(entity = HttpBody(formatter.contentType, formatter.format(nodes)))
 }
 
 

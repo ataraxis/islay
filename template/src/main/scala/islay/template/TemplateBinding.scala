@@ -19,6 +19,6 @@ trait TemplateBinding extends Route {
       template <- processor.lookup(context.request)
       nodes <- transform(template)
       expanded <- processor.expand(nodes, context)
-    } completeTemplate(expanded)
+    } completeTemplate(expanded, context)
   }
 }
