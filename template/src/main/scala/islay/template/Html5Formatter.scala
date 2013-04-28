@@ -18,7 +18,9 @@ class Html5Formatter extends Formatter {
     val root = nodes.find(_.isInstanceOf[Elem]) getOrElse <html/>
     val docType = DocType("html", SystemID("about:legacy-compat"), Nil)
 
-    XML.write(new OutputStreamWriter(out), root, "UTF-8", false, docType)
+    val writer = new OutputStreamWriter(out)
+    XML.write(writer, root, "UTF-8", false, docType)
+    writer.flush()
     out.toByteArray
   }
 }

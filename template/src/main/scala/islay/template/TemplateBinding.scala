@@ -16,7 +16,7 @@ trait TemplateBinding extends Route {
     import CallingThreadExecutor.Implicit
 
     for {
-      template <- processor.lookup(context.request)
+      template <- processor.lookup(context.request.path)
       nodes <- transform(template)
       expanded <- processor.expand(nodes, context)
     } completeTemplate(expanded, context)

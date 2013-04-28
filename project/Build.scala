@@ -1,5 +1,6 @@
 import sbt._
 import sbt.Keys._
+import spray.revolver.RevolverPlugin._
 
 
 object Build extends Build {
@@ -40,6 +41,12 @@ object Build extends Build {
     dependencies = Seq(web)
   )
 
+  lazy val example = Project(
+    id = "example",
+    base = file("example"),
+    settings = exampleSettings,
+    dependencies = Seq(web)
+  )
 
   override lazy val settings = super.settings :+ {
     shellPrompt := { s => Project.extract(s).currentProject.id + " > " }
@@ -95,7 +102,12 @@ object Settings {
     // we need to add the runtime classpath as a "-cp" argument to the `javaOptions in run`, otherwise caliper
     // will not see the right classpath and die with a ConfigurationException
     javaOptions in run <++= (fullClasspath in Runtime) map { cp => Seq("-cp", sbt.Build.data(cp).mkString(":")) }
-            
+  )
+
+  lazy val exampleSettings = defaultSettings ++ Revolver.settings ++ Seq(
+    libraryDependencies ++=
+      Dependencies.example ++
+      Dependencies.exampleTestkit
   )
 }
 
@@ -122,7 +134,8 @@ object Dependencies {
   )
   val webTestkit = baseTestkit ++ Seq(Test.sprayTestkit)
 
-  val benchmark = Seq(
-    Compile.caliper
-  )
+  val benchmark = Seq(Compile.caliper)
+
+  val example = Seq(Compile.sprayCan)
+  val exampleTestkit = baseTestkit ++ Seq(Test.sprayTestkit)
 }

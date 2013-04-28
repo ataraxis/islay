@@ -34,6 +34,7 @@ object Dependency {
     val logbackClassic  = "ch.qos.logback"              %   "logback-classic"       % V.Logback
     val parboiled       = "org.parboiled"               %%  "parboiled-scala"       % V.Parboiled
     val sprayRouting    = "io.spray"                    %   "spray-routing"         % V.Spray
+    val sprayCan        = "io.spray"                    %   "spray-can"             % V.Spray
   }
 
   object Test {

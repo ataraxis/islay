@@ -32,8 +32,15 @@ trait TemplateDirectives {
     }
   }
 
-  def template(path: String) {
-    ???
+  def template(path: String)(implicit executor: ExecutionContext, processor: TemplateProcessor): Route =
+    template(path, _)
+
+  def template(path: String, ctx: RequestContext)
+      (implicit executor: ExecutionContext, processor: TemplateProcessor) {
+    for {
+      nodes <- processor.lookup(path)
+      expanded <- processor.expand(nodes, ctx)
+    } completeTemplate(expanded, ctx)
   }
 
   def originalContext: Directive[RequestContext :: HNil] = ???
