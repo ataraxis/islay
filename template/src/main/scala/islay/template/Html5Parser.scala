@@ -46,7 +46,7 @@ class Html5Parser extends Parser {
     def startEntity(name: String) {}
   }
 
-  override def parseFragment(bytes: Array[Byte]): NodeSeq = {
+  def parseFragment(bytes: Array[Byte]): NodeSeq = {
     val nodes = parse(bytes)
     nodes.headOption match {
       case Some(html: Elem) if html.label == "html" =>
@@ -58,4 +58,6 @@ class Html5Parser extends Parser {
       case _ => nodes
     }
   }
+
+  override val contentBinding: Array[Byte] = "<islay:binding/>".getBytes
 }

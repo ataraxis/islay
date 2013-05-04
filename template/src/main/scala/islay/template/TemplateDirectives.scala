@@ -6,6 +6,7 @@ import scala.xml.NodeSeq
 
 import akka.actor._
 import shapeless._
+import spray.http.HttpRequest
 import spray.routing.{Directive, RequestContext, Route}
 
 
@@ -14,10 +15,10 @@ trait TemplateDirectives {
   def completeTemplate(nodes: NodeSeq)(implicit processor: TemplateProcessor): Route = completeTemplate(nodes, _)
 
   def completeTemplate(nodes: NodeSeq, ctx: RequestContext)(implicit processor: TemplateProcessor) {
-    ctx.responder match {
-      case r: TemplateResponder => r ! nodes
-      case r => r ! processor.format(nodes)
-    }
+    if (ctx.request.headers.contains(TemplateMarker))
+      ctx.responder ! nodes
+    else
+      ctx.responder ! processor.format(nodes)
   }
 
   def completeTemplate(future: Future[NodeSeq])
@@ -37,8 +38,9 @@ trait TemplateDirectives {
 
   def template(path: String, ctx: RequestContext)
       (implicit executor: ExecutionContext, processor: TemplateProcessor) {
+    val request = HttpRequest(uri = path).parseUri
     for {
-      nodes <- processor.lookup(path)
+      nodes <- processor.lookup(request)
       expanded <- processor.expand(nodes, ctx)
     } completeTemplate(expanded, ctx)
   }

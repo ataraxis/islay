@@ -23,7 +23,7 @@ with RouteDirectives with PathDirectives with TemplateDirectives {
 
   def stubParser(content: NodeSeq) = new Parser {
     override def parse(bytes: Array[Byte]) = content
-    override def parseFragment(bytes: Array[Byte]) = content
+    override val contentBinding = "<islay:binding/>".getBytes
   }
 
   def newProcessor = new TemplateProcessor {
@@ -53,8 +53,8 @@ with RouteDirectives with PathDirectives with TemplateDirectives {
   }
 
   test("A `FileNotFoundException` failure is returned for a path that cannot be matched") {
-    val request = HttpRequest(uri = "plah").parseUri
     intercept[FileNotFoundException] {
+      val request = HttpRequest(uri = "plah").parseUri
       val processor = newProcessor
       Await.result(processor.lookup(request), 1.second)
     }
@@ -74,28 +74,60 @@ with RouteDirectives with PathDirectives with TemplateDirectives {
 
     val context = RequestContext(request = HttpRequest(), responder = self)
 
-    processor.expand(ssi, context) match {
-      case None => fail("No expansion result")
-      case Some(f) =>
-        val result = Await.result(f, 1.second)
-        result.toString should equal ("<buffalo/>")
-    }
+    val f = processor.expand(ssi, context)
+    val result = Await.result(f, 1.second)
+    result.toString should equal ("<buffalo/>")
   }
 
   test("SSI expansion occurs within a nested node structure") {
 
     val ssi = Comment("""#include file="/buffalo"""")
-    val parser = Map("html" -> stubParser(ssi))
-    val processor = newProcessor.copy(parsers = parser)
-
+    val processor = newProcessor
     val context = RequestContext(request = HttpRequest(), responder = self)
 
     val nodes = <p/><div>{Comment("Pop")} {ssi}</div><br/>;
-    processor.expand(nodes, context) match {
-      case None => fail("No expansion result")
-      case Some(f) =>
-        val result = Await.result(f, 1.second)
-        result.toString should equal ("<p/><div><!--Pop--> <buffalo/></div><br/>")
+    val f = processor.expand(nodes, context)
+    val result = Await.result(f, 1.second)
+    result.toString should equal ("<p/><div><!--Pop--> <buffalo/></div><br/>")
+  }
+
+  test("Header and footer SSI expansion includes surrounded content") {
+
+    val processor = new TemplateProcessor {
+      override val route: Route =
+        path("header.html") { ctx =>
+          ctx.request.headers collectFirst { case SurroundEnd(p) => p } should be (Some("/footer.html?!"))
+          completeTemplate(<header/><islay:binding/><footer/>, ctx)
+        }
     }
+
+    val header = Comment("""#include file="/header.html"""")
+    val footer = Comment("""#include file="/footer.html?!"""")
+    val nodes = <div>{header}surrounded{footer}</div>
+
+    val context = RequestContext(request = HttpRequest(), responder = self)
+
+    val f = processor.expand(nodes, context)
+    val result = Await.result(f, 1.second)
+    result.toString should equal ("<div><header/>surrounded<footer/></div>")
+  }
+
+  test("SSI lookup includes bytes from both header and footer") {
+
+    var text = ""
+    val parser = new Parser {
+      override def parse(bytes: Array[Byte]) = {
+        text += new String(bytes)
+        <crash/>
+      }
+      override def contentBinding = "<boff/>".getBytes
+    }
+
+    val processor = newProcessor.copy(parsers = Map("html" -> parser))
+    val request = HttpRequest(uri = "/header.html", headers = List(SurroundEnd("/footer.html?!"))).parseUri
+
+    val nodes = Await.result(processor.lookup(request), 1.second)
+    text should equal ("<div><h1>Header</h1><boff/>!</div>")
+    nodes.toString should equal ("<crash/>")
   }
 }
