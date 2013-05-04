@@ -15,7 +15,7 @@ trait TemplateDirectives {
   def completeTemplate(nodes: NodeSeq)(implicit processor: TemplateProcessor): Route = completeTemplate(nodes, _)
 
   def completeTemplate(nodes: NodeSeq, ctx: RequestContext)(implicit processor: TemplateProcessor) {
-    if (ctx.request.headers.contains(TemplateMarker))
+    if (ctx.request.headers.contains(IncludeMarker))
       ctx.responder ! nodes
     else
       ctx.responder ! processor.format(nodes)

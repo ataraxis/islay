@@ -20,7 +20,8 @@ case class TemplateProcessor(
 
   root: Path = Resources.pathTo("webapp"),
   formatter: Formatter = new Html5Formatter,
-  parsers: Map[String, Parser] = Map("html" -> new Html5Parser)
+  parsers: Map[String, Parser] = Map("html" -> new Html5Parser),
+  executor: ExecutionContext = ExecutionContext.global
 
 ) extends RouteConcatenation {
   import TemplateDirectives._
@@ -32,8 +33,7 @@ case class TemplateProcessor(
 
 
   def route: Route = { context =>
-    /* TODO: get execution context from somewhere */
-    import ExecutionContext.Implicits.global
+    implicit val e = executor
     template(context.request.path, context)
   }
 
@@ -49,8 +49,7 @@ case class TemplateProcessor(
    * @throws FileNotFoundException inside a [[scala.util.Failure]] if the resource cannot be found
    */
   def lookup(request: HttpRequest): Future[NodeSeq] = {
-    /* TODO: get execution context from somewhere */
-    import ExecutionContext.Implicits.global
+    implicit val e = executor
 
     Future {
       resolvePath(request.path)
@@ -101,14 +100,22 @@ case class TemplateProcessor(
       case SurroundEnd(path) => path
     }
 
-  private type NodeReplacement = (Future[NodeSeq], Int, Int)
-
   /**
    * Recursively applies any SSI templates using this processor's `route` to resolve included
    * content.
    */
-  def expand(nodes: NodeSeq, context: RequestContext): Future[NodeSeq] =
-    maybeExpand(nodes, context) getOrElse Future.successful(nodes)
+  def expand(nodes: NodeSeq, context: RequestContext): Future[NodeSeq] = {
+    /* remove temporary routing/lookup headers so that they don't apply recursively */
+    val filteredHeaders = context.request.headers filterNot { h =>
+      h.isInstanceOf[SurroundEnd] || h == IncludeMarker
+    }
+    val filteredRequest = context.request.copy(headers = filteredHeaders)
+    val filteredContext = context.copy(request = filteredRequest)
+
+    maybeExpand(nodes, filteredContext) getOrElse Future.successful(nodes)
+  }
+
+  private type NodeReplacement = (Future[NodeSeq], Int, Int)
 
   private def maybeExpand(nodes: NodeSeq, context: RequestContext): Option[Future[NodeSeq]] = {
 
@@ -141,18 +148,18 @@ case class TemplateProcessor(
         findEndSsi(i+1) match {
 
           case Some((endUri, end)) =>
-            val includeReq = context.request.copy(headers = SurroundEnd(endUri) :: context.request.headers)
-            val includeContext = context.copy(request = includeReq)
+            val includeRequest = context.request.withHeaders(SurroundEnd(endUri) :: context.request.headers)
+            val includeContext = context.copy(request = includeRequest)
             import CallingThreadExecutor.Implicit
             val included = for {
-              includeNodes <- resolve(uri, includeContext)
+              includeNodes <- resolveInclude(uri, includeContext)
               surrounded = nodes.slice(i+1, end)
               content <- maybeExpand(surrounded, context) getOrElse Future.successful(surrounded)
             } yield bindContent(includeNodes, content) getOrElse sys.error("Could not find binding in surrounded content")
             (included, end)
 
           case _ =>
-            (resolve(uri, context), i)
+            (resolveInclude(uri, context), i)
         }
       }
     }
@@ -162,12 +169,8 @@ case class TemplateProcessor(
       if (i < nodes.length) {
         nodes(i) match {
           case comment: Comment =>
-            ssiUri(comment) match {
-              case Some(path) if path.endsWith("?!") =>
-                Some((path, i))
-              case _ =>
-                None
-            }
+            for (path <- ssiUri(comment) if path.endsWith("?!"))
+            yield (path, i)
           case _ =>
             findEndSsi(i+1)
         }
@@ -233,12 +236,12 @@ case class TemplateProcessor(
     }
   }
 
-  private def resolve(ssiUri: String, context: RequestContext): Future[NodeSeq] = {
+  private def resolveInclude(ssiUri: String, context: RequestContext): Future[NodeSeq] = {
     val request = context.request
     val templateRequest = request.copy(
       method = HttpMethods.GET,
       uri = ssiUri,
-      headers = TemplateMarker :: request.headers,
+      headers = IncludeMarker :: request.headers,
       entity = EmptyEntity,
       protocol = HttpProtocols.`HTTP/1.1`
     ).parseUri
@@ -252,7 +255,7 @@ case class TemplateProcessor(
     promise.future
   }
 
-  private val ssiRegex = """#include (?:virtual|file)="(.*?)"\s*""".r
+  private val ssiRegex = """\s*#include (?:virtual|file)="(.*?)"\s*""".r
 
   private def ssiUri(comment: Comment): Option[String] =
     ssiRegex findFirstMatchIn comment.commentText map (_ group 1)
@@ -276,12 +279,20 @@ extends UnregisteredActorRef(delegate) {
   }
 }
 
-private[islay] case object TemplateMarker extends HttpHeader {
-  def name = "X-Islay-Template"
-  def lowercaseName = "x-islay-template"
+/**
+ * Used by `completeTemplate()` to decide whether a response should be forwarded as a NodeSeq for
+ * inclusion in the surrounding document or as the final `HttpResponse`.
+ */
+private[islay] case object IncludeMarker extends HttpHeader {
+  def name = "X-Islay-Include"
+  def lowercaseName = "x-islay-include"
   def value = ""
 }
 
+/**
+ * Passed from `expand()` to the route for the include when a surrounding SSI pair is encountered
+ * so that `lookup()` can parse both the start and end fragments as a single template.
+ */
 private[islay] case class SurroundEnd(uri: String) extends HttpHeader {
   def name = "X-Islay-Surround-End"
   def lowercaseName = "x-islay-surround-end"
