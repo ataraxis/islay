@@ -12,16 +12,15 @@ class Html5Formatter extends Formatter {
 
   override def contentType: ContentType = ContentType(MediaTypes.`text/html`, HttpCharsets.`UTF-8`)
 
-  override def format(nodes: NodeSeq): Array[Byte] = {
+  override def format(result: TemplateResult): Array[Byte] = {
 
     val out = new ByteArrayOutputStream
-    val root = nodes.find(_.isInstanceOf[Elem]) getOrElse <html/>
 
     val systemId = new SystemID("") { override def toString = "" }
     val docType = DocType("html", systemId, Nil)
 
     val writer = new OutputStreamWriter(out)
-    XML.write(writer, root, "UTF-8", false, docType)
+    XML.write(writer, result.html, "UTF-8", false, docType)
     writer.flush()
     out.toByteArray
   }

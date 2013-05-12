@@ -1,8 +1,8 @@
 package islay.template
 
+import islay.transform.CallingThreadExecutor
 import islay.transform.Transform
 import spray.routing.{RequestContext, Route}
-import islay.transform.CallingThreadExecutor
 
 
 trait TemplateBinding extends Route {
@@ -15,10 +15,12 @@ trait TemplateBinding extends Route {
     import TemplateDirectives._
     import CallingThreadExecutor.Implicit
 
-    for {
+    val f = for {
       template <- processor.lookup(context.request)
       nodes <- transform(template)
       expanded <- processor.expand(nodes, context)
-    } completeTemplate(expanded, context)
+    } yield expanded
+
+    complete(f, context)
   }
 }

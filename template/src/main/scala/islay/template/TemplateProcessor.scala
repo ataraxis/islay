@@ -104,7 +104,7 @@ case class TemplateProcessor(
    * Recursively applies any SSI templates using this processor's `route` to resolve included
    * content.
    */
-  def expand(nodes: NodeSeq, context: RequestContext): Future[NodeSeq] = {
+  def expand(nodes: NodeSeq, context: RequestContext): Future[TemplateResult] = {
     /* remove temporary routing/lookup headers so that they don't apply recursively */
     val filteredHeaders = context.request.headers filterNot { h =>
       h.isInstanceOf[SurroundEnd] || h == IncludeMarker
@@ -112,12 +112,12 @@ case class TemplateProcessor(
     val filteredRequest = context.request.copy(headers = filteredHeaders)
     val filteredContext = context.copy(request = filteredRequest)
 
-    maybeExpand(nodes, filteredContext) getOrElse Future.successful(nodes)
+    maybeExpand(nodes, filteredContext) getOrElse Future.successful(TemplateResult(NodeSeq.Empty, nodes))
   }
 
-  private type NodeReplacement = (Future[NodeSeq], Int, Int)
+  private type NodeReplacement = (Future[TemplateResult], Int, Int)
 
-  private def maybeExpand(nodes: NodeSeq, context: RequestContext): Option[Future[NodeSeq]] = {
+  private def maybeExpand(nodes: NodeSeq, context: RequestContext): Option[Future[TemplateResult]] = {
 
     @tailrec
     def getReplacements(i: Int, replacements: List[NodeReplacement]): List[NodeReplacement] = {
@@ -127,8 +127,15 @@ case class TemplateProcessor(
         val maybeReplacement =
           nodes(i) match {
             case elem: Elem =>
-              import CallingThreadExecutor.Implicit
-              maybeExpand(elem.child, context).map(f => (f.map(ns => elem.copy(child = ns)), i))
+              maybeExpand(elem.child, context) match {
+                case None if elem.label == "head" =>
+                  Some((Future.successful(TemplateResult(elem.child, NodeSeq.Empty)), i))
+                case Some(future) =>
+                  import CallingThreadExecutor.Implicit
+                  Some((future.map(_.withParent(elem)), i))
+                case _ =>
+                  None
+              }
             case comment: Comment =>
               maybeInclude(comment, i)
             case _ =>
@@ -143,7 +150,7 @@ case class TemplateProcessor(
       }
     }
 
-    def maybeInclude(comment: Comment, i: Int): Option[(Future[NodeSeq], Int)] = {
+    def maybeInclude(comment: Comment, i: Int): Option[(Future[TemplateResult], Int)] = {
       ssiUri(comment) map { uri =>
         findEndSsi(i+1) match {
 
@@ -154,8 +161,8 @@ case class TemplateProcessor(
             val included = for {
               includeNodes <- resolveInclude(uri, includeContext)
               surrounded = nodes.slice(i+1, end)
-              content <- maybeExpand(surrounded, context) getOrElse Future.successful(surrounded)
-            } yield bindContent(includeNodes, content) getOrElse sys.error("Could not find binding in surrounded content")
+              content <- expand(surrounded, context)
+            } yield bindContent(includeNodes, content)
             (included, end)
 
           case _ =>
@@ -182,7 +189,14 @@ case class TemplateProcessor(
     replaceNodes(nodes, getReplacements(0, Nil))
   }
 
-  private def bindContent(nodes: NodeSeq, content: NodeSeq): Option[NodeSeq] = {
+  private def bindContent(surrounding: TemplateResult, content: TemplateResult): TemplateResult = {
+    val newHead = surrounding.head ++ content.head
+    val newBody = bindContentBody(surrounding.body, content.body) getOrElse
+      sys.error("Could not find binding in surrounded content")
+    TemplateResult(head = newHead, body = newBody)
+  }
+
+  private def bindContentBody(nodes: NodeSeq, content: NodeSeq): Option[NodeSeq] = {
 
     @tailrec
     def findReplacement(i: Int): Option[(NodeSeq, Int)] = {
@@ -194,7 +208,7 @@ case class TemplateProcessor(
             case elem: Elem if elem.prefix == "islay" && elem.label == "binding" =>
               Some(content -> i)
             case elem: Elem =>
-              bindContent(elem.child, content) map { ns =>
+              bindContentBody(elem.child, content) map { ns =>
                 elem.copy(child = ns) -> i
               }
             case _ =>
@@ -212,31 +226,40 @@ case class TemplateProcessor(
     }
   }
 
-  private def replaceNodes(nodes: NodeSeq, replacements: List[NodeReplacement]): Option[Future[NodeSeq]] = {
+  private def replaceNodes(nodes: NodeSeq, replacements: List[NodeReplacement]): Option[Future[TemplateResult]] = {
     import CallingThreadExecutor.Implicit
 
     if (replacements.isEmpty)
       None
     else {
       var remaining = replacements.reverse
-      var newNodes = List[Future[NodeSeq]]()
+      var newHead = List[Future[NodeSeq]]()
+      var newBody = List[Future[NodeSeq]]()
       var i = 0
       while (i < nodes.length) {
-        newNodes ::= (remaining match {
+        remaining match {
           case (replacement, start, end) :: tail if start == i =>
             remaining = tail
             i = end
-            replacement
+            newHead ::= replacement.map(_.head)
+            newBody ::= replacement.map(_.body)
           case _ =>
-            Future.successful(nodes(i))
-        })
+            newHead ::= Future.successful(NodeSeq.Empty)
+            newBody ::= Future.successful(nodes(i))
+        }
         i = i+1
       }
-      Some(Future.sequence(newNodes).map(_.reverse.flatten))
+
+      val result = for {
+        head <- Future.sequence(newHead).map(_.reverse.flatten)
+        body <- Future.sequence(newBody).map(_.reverse.flatten)
+      } yield TemplateResult(head = head, body = body)
+
+      Some(result)
     }
   }
 
-  private def resolveInclude(ssiUri: String, context: RequestContext): Future[NodeSeq] = {
+  private def resolveInclude(ssiUri: String, context: RequestContext): Future[TemplateResult] = {
     val request = context.request
     val templateRequest = request.copy(
       method = HttpMethods.GET,
@@ -246,7 +269,7 @@ case class TemplateProcessor(
       protocol = HttpProtocols.`HTTP/1.1`
     ).parseUri
 
-    val promise = Promise[NodeSeq]
+    val promise = Promise[TemplateResult]
     val responder = new TemplateResponder(promise, context.responder)
 
     val templateContext = RequestContext(templateRequest, responder, templateRequest.path)
@@ -261,18 +284,39 @@ case class TemplateProcessor(
     ssiRegex findFirstMatchIn comment.commentText map (_ group 1)
 
 
-  def format(nodes: NodeSeq): HttpResponse =
-    HttpResponse(entity = HttpBody(formatter.contentType, formatter.format(nodes)))
+  def format(result: TemplateResult): HttpResponse =
+    HttpResponse(entity = HttpBody(formatter.contentType, formatter.format(result)))
 }
 
+case class TemplateResult(head: NodeSeq = NodeSeq.Empty, body: NodeSeq = NodeSeq.Empty) {
 
-private[islay] class TemplateResponder(promise: Promise[NodeSeq], delegate: ActorRef)
+  def withParent(parent: Elem): TemplateResult = {
+    if (parent.label == "head")
+      copy(head = head ++ parent.child)
+    else
+      copy(body = parent.copy(child = body))
+  }
+
+  def html = body collectFirst {
+    case html: Elem if html.label == "html" =>
+      html.child collectFirst {
+        case realBody: Elem if realBody.label == "body" =>
+          <html><head>{head}</head>{realBody}</html>
+      } getOrElse {
+        <html><head>{head}</head><body>{body}</body></html>
+      }
+  } getOrElse {
+    <html><head>{head}</head><body>{body}</body></html>
+  }
+}
+
+private[islay] class TemplateResponder(promise: Promise[TemplateResult], delegate: ActorRef)
 extends UnregisteredActorRef(delegate) {
 
   override def handle(message: Any)(implicit sender: ActorRef) {
     message match {
-      case nodes: NodeSeq =>
-        promise.complete(Success(nodes))
+      case expansion: TemplateResult =>
+        promise.complete(Success(expansion))
       case Status.Failure(ex) =>
         promise.complete(Failure(ex))
     }

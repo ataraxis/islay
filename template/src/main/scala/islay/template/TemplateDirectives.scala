@@ -12,24 +12,23 @@ import spray.routing.{Directive, RequestContext, Route}
 
 trait TemplateDirectives {
 
-  def completeTemplate(nodes: NodeSeq)(implicit processor: TemplateProcessor): Route = completeTemplate(nodes, _)
+  def complete(result: TemplateResult)(implicit processor: TemplateProcessor): Route = complete(result, _)
 
-  def completeTemplate(nodes: NodeSeq, ctx: RequestContext)(implicit processor: TemplateProcessor) {
+  def complete(result: TemplateResult, ctx: RequestContext)(implicit processor: TemplateProcessor) {
     if (ctx.request.headers.contains(IncludeMarker))
-      ctx.responder ! nodes
+      ctx.responder ! result
     else
-      ctx.responder ! processor.format(nodes)
+      ctx.responder ! processor.format(result)
   }
 
-  def completeTemplate(future: Future[NodeSeq])
-      (implicit executor: ExecutionContext, processor: TemplateProcessor): Route = completeTemplate(future, _)
+  def complete(future: Future[TemplateResult])
+      (implicit executor: ExecutionContext, processor: TemplateProcessor): Route = complete(future, _)
 
-  def completeTemplate(future: Future[NodeSeq], ctx: RequestContext)
+  def complete(future: Future[TemplateResult], ctx: RequestContext)
       (implicit executor: ExecutionContext, processor: TemplateProcessor) {
     future onComplete {
-      case Success(nodes) => completeTemplate(nodes, ctx)
+      case Success(result) => complete(result, ctx)
       case Failure(ex) => ctx.failWith(ex)
-      case m => ctx.failWith(new Exception("Invalid template completion: "+ m))
     }
   }
 
@@ -38,11 +37,12 @@ trait TemplateDirectives {
 
   def template(path: String, ctx: RequestContext)
       (implicit executor: ExecutionContext, processor: TemplateProcessor) {
-    val request = HttpRequest(uri = path).parseUri
-    for {
+    val request = ctx.request.copy(uri = path).parseUri
+    val f = for {
       nodes <- processor.lookup(request)
       expanded <- processor.expand(nodes, ctx)
-    } completeTemplate(expanded, ctx)
+    } yield expanded
+    complete(f, ctx)
   }
 
   def originalContext: Directive[RequestContext :: HNil] = ???

@@ -28,7 +28,7 @@ with RouteDirectives with PathDirectives with TemplateDirectives {
 
   def newProcessor = new TemplateProcessor {
     override val parsers = Map("html" -> stubParser(<html/>))
-    override val route = completeTemplate(<buffalo/>)
+    override val route = complete(TemplateResult(body = <buffalo/>))
   }
 
   test("A resource with a known file extension can be found at an exact path") {
@@ -68,7 +68,7 @@ with RouteDirectives with PathDirectives with TemplateDirectives {
     implicit val processor = new TemplateProcessor(parsers = parser) {
       override val route = path("buffalo" / IntNumber) { i =>
         i should be (1)
-        completeTemplate(<buffalo/>)
+        complete(TemplateResult(body = <buffalo/>))
       }
     }
 
@@ -76,7 +76,7 @@ with RouteDirectives with PathDirectives with TemplateDirectives {
 
     val f = processor.expand(ssi, context)
     val result = Await.result(f, 1.second)
-    result.toString should equal ("<buffalo/>")
+    result.body.toString should equal ("<buffalo/>")
   }
 
   test("SSI expansion occurs within a nested node structure") {
@@ -88,7 +88,7 @@ with RouteDirectives with PathDirectives with TemplateDirectives {
     val nodes = <p/><div>{Comment("Pop")} {ssi}</div><br/>;
     val f = processor.expand(nodes, context)
     val result = Await.result(f, 1.second)
-    result.toString should equal ("<p/><div><!--Pop--> <buffalo/></div><br/>")
+    result.body.toString should equal ("<p/><div><!--Pop--> <buffalo/></div><br/>")
   }
 
   test("Header and footer SSI expansion includes surrounded content") {
@@ -97,7 +97,7 @@ with RouteDirectives with PathDirectives with TemplateDirectives {
       override val route: Route =
         path("header.html") { ctx =>
           ctx.request.headers collectFirst { case SurroundEnd(p) => p } should be (Some("/footer.html?!"))
-          completeTemplate(<header/><islay:binding/><footer/>, ctx)
+          complete(TemplateResult(body = <header/><islay:binding/><footer/>), ctx)
         }
     }
 
@@ -109,7 +109,7 @@ with RouteDirectives with PathDirectives with TemplateDirectives {
 
     val f = processor.expand(nodes, context)
     val result = Await.result(f, 1.second)
-    result.toString should equal ("<div><header/>surrounded<footer/></div>")
+    result.body.toString should equal ("<div><header/>surrounded<footer/></div>")
   }
 
   test("SSI lookup includes bytes from both header and footer") {
@@ -129,5 +129,20 @@ with RouteDirectives with PathDirectives with TemplateDirectives {
     val nodes = Await.result(processor.lookup(request), 1.second)
     text should equal ("<div><h1>Header</h1><boff/>!</div>")
     nodes.toString should equal ("<crash/>")
+  }
+
+  test("Head is merged from body") {
+
+    val nodes =
+      <html><head><title>Buffalo</title></head><body><head><title>Boff</title></head>Boofalu?</body></html>
+
+    val processor = newProcessor
+    val context = RequestContext(request = HttpRequest(), responder = self)
+    processor.expand(nodes, context)
+
+    val f = processor.expand(nodes, context)
+    val result = Await.result(f, 1.second)
+    result.head.toString should equal ("<title>Buffalo</title><title>Boff</title>")
+    result.body.toString should equal ("<html><body>Boofalu?</body></html>")
   }
 }
