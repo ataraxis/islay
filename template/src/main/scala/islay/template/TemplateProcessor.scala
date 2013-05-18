@@ -20,10 +20,9 @@ case class TemplateProcessor(
 
   root: Path = Resources.pathTo("webapp"),
   formatter: Formatter = new Html5Formatter,
-  parsers: Map[String, Parser] = Map("html" -> new Html5Parser),
-  executor: ExecutionContext = ExecutionContext.global
+  parsers: Map[String, Parser] = Map("html" -> new Html5Parser)
 
-) extends RouteConcatenation {
+)(implicit executor: ExecutionContext) extends RouteConcatenation {
   import TemplateDirectives._
 
 
@@ -33,7 +32,6 @@ case class TemplateProcessor(
 
 
   def route: Route = { context =>
-    implicit val e = executor
     template(context.request.path, context)
   }
 
@@ -49,7 +47,6 @@ case class TemplateProcessor(
    * @throws FileNotFoundException inside a [[scala.util.Failure]] if the resource cannot be found
    */
   def lookup(request: HttpRequest): Future[NodeSeq] = {
-    implicit val e = executor
 
     Future {
       resolvePath(request.path)
@@ -62,7 +59,7 @@ case class TemplateProcessor(
         case Some(endPath) =>
           val endBytes = Resources.readAllBytes(resolvePath(endPath)._1)
           for (start <- startBytes; end <- endBytes)
-          yield start ++ parser.contentBinding ++ end
+          yield Array.concat(start, parser.contentBinding, end)
       }
       allBytes.map(parser.parse)
     }

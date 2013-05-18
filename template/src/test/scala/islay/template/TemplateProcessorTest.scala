@@ -2,7 +2,7 @@ package islay.template
 
 import java.io.FileNotFoundException
 
-import scala.concurrent.Await
+import scala.concurrent.{Await, ExecutionContext}
 import scala.concurrent.duration.DurationInt
 import scala.xml.{Comment, NodeSeq}
 
@@ -20,6 +20,8 @@ import spray.routing.directives._
 class TemplateProcessorTest extends TestKit(ActorSystem("test")) with ImplicitSender
 with FunSuite with ShouldMatchers
 with RouteDirectives with PathDirectives with TemplateDirectives {
+
+  import ExecutionContext.Implicits.global
 
   def stubParser(content: NodeSeq) = new Parser {
     override def parse(bytes: Array[Byte]) = content

@@ -2,11 +2,8 @@ package islay.template
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
-import scala.xml.NodeSeq
 
-import akka.actor._
 import shapeless._
-import spray.http.HttpRequest
 import spray.routing.{Directive, RequestContext, Route}
 
 
