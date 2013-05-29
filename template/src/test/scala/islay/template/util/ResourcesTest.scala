@@ -1,8 +1,9 @@
-package islay.template
+package islay.template.util
 
 import java.nio.file.{Files, InvalidPathException}
 
-import scala.concurrent.{Await, ExecutionContext}
+import scala.concurrent.Await
+import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.DurationInt
 
 import org.scalatest.FunSuite

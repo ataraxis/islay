@@ -33,8 +33,9 @@ object Dependency {
     //val compiler        = "org.scala-lang"              %   "scala-compiler"        % scalaVersion(_)
     val logbackClassic  = "ch.qos.logback"              %   "logback-classic"       % V.Logback
     val parboiled       = "org.parboiled"               %%  "parboiled-scala"       % V.Parboiled
-    val sprayRouting    = "io.spray"                    %   "spray-routing"         % V.Spray
+    val sprayCaching    = "io.spray"                    %   "spray-caching"         % V.Spray
     val sprayCan        = "io.spray"                    %   "spray-can"             % V.Spray
+    val sprayRouting    = "io.spray"                    %   "spray-routing"         % V.Spray
   }
 
   object Test {

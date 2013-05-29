@@ -12,8 +12,7 @@ class WebContext(private val requestContext: RequestContext) {
   val attributes: Map[String, Any] = findAttributes(request.headers)
 
   private def findAttributes(headers: List[HttpHeader]) =
-    headers.foldLeft(Map.empty[String, Any]) {
-      case (_, h: RequestAttributes) => h.attributes
-      case (acc, _) => acc
-    }
+    headers.collectFirst {
+      case RequestAttributes(attributes) => attributes
+    } getOrElse Map.empty
 }

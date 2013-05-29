@@ -1,4 +1,4 @@
-package islay.template
+package islay.template.util
 
 import java.io.FileNotFoundException
 import java.lang.UnsupportedOperationException
@@ -85,6 +85,16 @@ object Resources {
 
     } recover { case _: UnsupportedOperationException =>
       Files.readAllBytes(resource)
+    }
+  }
+
+  def list(directory: Path)(implicit executor: ExecutionContext): Future[Seq[Path]] = {
+    Future {
+      val stream = Files.newDirectoryStream(directory)
+      try
+        collection.JavaConversions.iterableAsScalaIterable(stream).toSeq
+      finally
+        stream.close()
     }
   }
 }

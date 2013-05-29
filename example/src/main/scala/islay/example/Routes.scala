@@ -1,9 +1,9 @@
 package islay.example
 
+import islay.example.pages.UsersPageModule
+import islay.web.Directives
 import spray.routing.Route
 import spray.routing.directives.PathMatchers
-import islay.web.Directives
-import islay.example.pages.UsersPageModule
 
 
 trait Routes
@@ -16,7 +16,9 @@ trait Routes
 
   def route: Route = (
     path("users") {
-      usersPage
+      dynamic {
+        usersPage
+      }
     }
   )
 }

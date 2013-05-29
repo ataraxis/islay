@@ -4,13 +4,14 @@ import java.io.FileNotFoundException
 import java.nio.file.{Files, Path}
 
 import scala.annotation.tailrec
-import scala.concurrent.{Future, Promise}
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.util.{Failure, Success}
 import scala.xml.{Comment, Elem, NodeSeq}
 
-import akka.actor._
+import TemplateDirectives.template
+import akka.actor.{ActorRef, Status}
 import akka.spray.UnregisteredActorRef
+import islay.template.util.Resources
 import islay.transform.CallingThreadExecutor
 import spray.http.{EmptyEntity, HttpBody, HttpHeader, HttpMethods, HttpProtocols, HttpRequest, HttpResponse}
 import spray.routing.{RequestContext, Route, RouteConcatenation}
@@ -22,7 +23,7 @@ case class TemplateProcessor(
   formatter: Formatter = new Html5Formatter,
   parsers: Map[String, Parser] = Map("html" -> new Html5Parser)
 
-)(implicit executor: ExecutionContext) extends RouteConcatenation {
+)(implicit val executor: ExecutionContext) extends RouteConcatenation {
   import TemplateDirectives._
 
 

@@ -68,7 +68,7 @@ object Settings {
 
   lazy val defaultSettings = Defaults.defaultSettings ++ buildSettings ++ Seq(
     resolvers       ++= Dependency.resolutionRepos,
-    scalaVersion    := "2.10.0",
+    scalaVersion    := "2.10.1",
     scalacOptions   ++= Seq("-encoding", "UTF-8", "-deprecation", "-unchecked")
   )
 
@@ -123,6 +123,7 @@ object Dependencies {
   val template = Seq(
     Compile.akkaActor,
     Compile.htmlParser,
+    Compile.sprayCaching,
     Compile.sprayRouting
   )
   val templateTestkit = baseTestkit ++ Seq(Test.akkaTestkit)
@@ -130,6 +131,7 @@ object Dependencies {
   val web = Seq(
     Compile.akkaActor,
     Compile.logbackClassic,
+    Compile.sprayCaching,
     Compile.sprayRouting
   )
   val webTestkit = baseTestkit ++ Seq(Test.sprayTestkit)
