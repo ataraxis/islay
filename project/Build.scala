@@ -107,7 +107,8 @@ object Settings {
   lazy val exampleSettings = defaultSettings ++ Revolver.settings ++ Seq(
     libraryDependencies ++=
       Dependencies.example ++
-      Dependencies.exampleTestkit
+      Dependencies.exampleTestkit,
+      watchSources ~= { ws => ws filter { f => f.getName.endsWith(".conf") || !f.getAbsolutePath.contains("src/main/resources") } }
   )
 }
 

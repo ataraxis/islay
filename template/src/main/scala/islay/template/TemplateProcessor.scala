@@ -1,18 +1,17 @@
 package islay.template
 
-import java.io.FileNotFoundException
-import java.nio.file.{Files, Path}
+import java.nio.file.{Files, NoSuchFileException, Path}
 
 import scala.annotation.tailrec
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.util.{Failure, Success}
 import scala.xml.{Comment, Elem, NodeSeq}
 
-import TemplateDirectives.template
 import akka.actor.{ActorRef, Status}
 import akka.spray.UnregisteredActorRef
 import islay.template.util.Resources
 import islay.transform.CallingThreadExecutor
+import spray.caching.LruCache
 import spray.http.{EmptyEntity, HttpBody, HttpHeader, HttpMethods, HttpProtocols, HttpRequest, HttpResponse}
 import spray.routing.{RequestContext, Route, RouteConcatenation}
 
@@ -29,7 +28,7 @@ case class TemplateProcessor(
 
   implicit val self = this
 
-  private val cache = "TODO"
+  private val cache = LruCache[NodeSeq]()
 
 
   def route: Route = { context =>
@@ -38,17 +37,26 @@ case class TemplateProcessor(
 
 
   /**
-   * Returns a template parsed from the resource found at the given path (of the `HttpRequest`)
+   * Returns a template parsed from the resource found at the given path (on the `HttpRequest`)
    * relative to this processor's root. If the path doesn't exactly match a resource or there isn't
    * a parser for the resource's file extension, then this method will look for a resource by
    * appending the file extension of each available parser until a match is made. If the path
    * matches a directory then a resource named "index" in that directory will be searched for
    * instead.
    *
-   * @throws FileNotFoundException inside a [[scala.util.Failure]] if the resource cannot be found
+   * If the setting `islay.template.reload-resources` is false, then a cache will be used to ensure
+   * that the template is only parsed once for any given path.
+   *
+   * @throws NoSuchFileException inside a [[scala.util.Failure]] if the resource cannot be found
    */
   def lookup(request: HttpRequest): Future[NodeSeq] = {
+    if (TemplateSettings.reloadResources)
+      doLookup(request)
+    else
+      cache.fromFuture(request.path)(doLookup(request))
+  }
 
+  private def doLookup(request: HttpRequest): Future[NodeSeq] = {
     Future {
       resolvePath(request.path)
 
@@ -81,7 +89,7 @@ case class TemplateProcessor(
       @tailrec
       def loop(parsers: List[(String, Parser)]): (Path, Parser) =
         parsers match {
-          case Nil => throw new FileNotFoundException(path)
+          case Nil => throw new NoSuchFileException(path)
           case (extension, parser) :: tail =>
             val extendedPath = fullPath.getParent.resolve(fullPath.getFileName +"."+ extension)
             if (Files.exists(extendedPath))
