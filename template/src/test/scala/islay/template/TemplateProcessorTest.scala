@@ -1,6 +1,6 @@
 package islay.template
 
-import java.io.FileNotFoundException
+import java.nio.file.NoSuchFileException
 
 import scala.concurrent.{Await, ExecutionContext}
 import scala.concurrent.duration.DurationInt
@@ -54,8 +54,8 @@ with RouteDirectives with PathDirectives with TemplateDirectives {
     result should equal (<html/>)
   }
 
-  test("A `FileNotFoundException` failure is returned for a path that cannot be matched") {
-    intercept[FileNotFoundException] {
+  test("A `NoSuchFileException` failure is returned for a path that cannot be matched") {
+    intercept[NoSuchFileException] {
       val request = HttpRequest(uri = "plah").parseUri
       val processor = newProcessor
       Await.result(processor.lookup(request), 1.second)

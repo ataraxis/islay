@@ -16,5 +16,8 @@ trait UserDaoModule {
     )
 
     def findAll: Seq[User] = users.toSeq
+
+    def findByUsername(username: String): Option[User] =
+      findAll.filter(_.username == username).headOption
   }
 }

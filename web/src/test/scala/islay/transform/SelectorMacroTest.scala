@@ -13,10 +13,11 @@ import scala.concurrent.Future
  */
 class SelectorMacroTest extends FunSuite with ShouldMatchers {
 
-  ignore("whatever") ({
+  def compilationChecks = {
     c"a + b" should (equal (Selector(Nil)))
 
     c"a + b" <> Some((c"b *" <> List("Hello"))) &
     (c"foo" ** "bar" when (true))
-  })
+  }
+
 }

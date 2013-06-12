@@ -17,7 +17,8 @@ trait UsersPageModule extends UserDaoModule with TemplateProcessorModule {
       c"table".before(Message("greeting")) &
       c".users" <> userDao.findAll.map ( user =>
         c".username" ** user.username &
-        c".full-name" ** user.fullName
+        c".full-name" ** user.fullName &
+        c"a.username".addAttr("href", "/user/"+ user.username)
       )
     )
   }

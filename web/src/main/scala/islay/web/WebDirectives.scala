@@ -2,8 +2,8 @@ package islay.web
 
 import islay.template.TemplateProcessor
 import islay.transform.Transform
-import shapeless._
-import spray.http.HttpHeader
+import shapeless.{:: => ::, HNil}
+import spray.http.{HttpHeader, HttpHeaders}
 import spray.routing.{Directive, Directive0, RequestContext, Route}
 import spray.routing.directives._
 
@@ -21,12 +21,6 @@ object WebHeaders {
     def lowercaseName = "x-request-attributes"
     def value = ""
     def addAttr(name: String, value: Any) = copy(attributes = attributes + (name -> value))
-  }
-
-  case class SubmittedValues(values: Map[String, String]) extends HttpHeader {
-    def name = "X-Submitted-Values"
-    def lowercaseName = "x-submitted-values"
-    def value = ""
   }
 }
 
@@ -50,7 +44,23 @@ trait WebDirectives {
   }
 
   def flash(content: Message): Directive0 = flash('notice, content)
-  def flash(level: Symbol, content: Message): Directive0 = ???
+
+  def flash(level: Symbol, content: Message): Directive0 = mapHttpResponseHeaders { headers =>
+    headers map {
+      case Refresh(timeout, url) =>
+        Refresh(timeout, flashUrl(url, level, content))
+      case HttpHeaders.Location(url) =>
+        HttpHeaders.Location(flashUrl(url, level, content))
+      case other =>
+        other
+    }
+  }
+
+  private def flashUrl(url: String, level: Symbol, content: Message) =
+    if (url.contains("?")) url +"&"+ encodeFlash(level, content)
+    else url +"?"+ encodeFlash(level, content)
+
+  private def encodeFlash(level: Symbol, content: Message) = content.toString
 
   def requestAttr[T](name: String): Directive[Option[T] :: HNil] = ???
   def requestAttr(name: String, value: Any): Directive0 = ???

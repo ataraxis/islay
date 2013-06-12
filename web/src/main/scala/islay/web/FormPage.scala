@@ -6,16 +6,20 @@ import spray.routing.RequestContext
 
 trait FormPage extends Page {
 
-  def form: Form
+  val form: Form
+
 
   override def apply(context: RequestContext) {
+    super.init(context)
+    form.complete()
     context.request.method match {
-      case HttpMethods.POST | HttpMethods.PUT =>
-        super.init(context)
-        ???
-        super.bind()
+      case HttpMethods.GET | HttpMethods.HEAD =>
       case _ =>
-        super.apply(context)
+        /* TODO: check CSRF token */
+    }
+    form.process() match {
+      case Some(route) => route.apply(context)
+      case None => super.bind()
     }
   }
 }

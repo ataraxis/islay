@@ -4,10 +4,12 @@ import islay.example.pages.UsersPageModule
 import islay.web.Directives
 import spray.routing.Route
 import spray.routing.directives.PathMatchers
+import islay.example.pages.UserDetailPageModule
 
 
 trait Routes
   extends UsersPageModule
+  with UserDetailPageModule
   with TemplateProcessorModule {
 
   import Directives._
@@ -16,8 +18,11 @@ trait Routes
 
   def route: Route = (
     path("users") {
-      dynamic {
-        usersPage
+      dynamic(usersPage)
+    } ~
+    path("user" / PathElement) { username =>
+      rewritePath("user") {
+        userDetailPage(username)
       }
     }
   )

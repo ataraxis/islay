@@ -10,23 +10,22 @@ import spray.http.HttpRequest
 
 object TextInput {
 
-  def apply[A](default: A, id: String = null, required: Boolean = false, validator: (A => Unit) = { _: A => () })
-      (implicit tc: TextConverter[A], r: HttpRequest, ls: Seq[Locale], e: ExecutionContext): Component[A] = {
-    new TextInput(default, Option(id), required, validator)
+  def apply[A](default: A, required: Boolean = false, validator: (A => Unit) = { _: A => () })
+      (implicit tc: FieldConverter[A], r: HttpRequest, ls: Seq[Locale], e: ExecutionContext): TextInput[A] = {
+    new TextInput(default, required, validator)
   }
 }
 
 class TextInput[A] private (
     override val default: A,
-    override val maybeId: Option[String],
     required: Boolean,
     validator: (A => Unit)
 )(implicit
-    tc: TextConverter[A],
+    tc: FieldConverter[A],
     r: HttpRequest,
     ls: Seq[Locale],
     executor: ExecutionContext
-) extends Component[A] {
+) extends ValueComponent[A] {
 
 
   override def bindTo(elem: Elem): Future[NodeSeq] = Future successful {
@@ -34,10 +33,9 @@ class TextInput[A] private (
     val attributes =
       elem.attributes append
         Attribute("type", Text("text"),
-        Attribute("id", Text(id),
         Attribute("name", Text(name),
-        Attribute("value", Text(submittedValue),
-        Null))))
+        Attribute("value", Text(valueAsString),
+        Null)))
 
     <input/> % attributes
   }
