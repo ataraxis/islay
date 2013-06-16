@@ -4,9 +4,11 @@ import islay.template.TemplateProcessor
 import spray.routing.{HttpService, Route}
 
 
-trait TemplateProcessorModule extends HttpService with TemplateRoutes {
+trait TemplateProcessorModule extends ExecutorModule with TemplateRoutes {
 
-  implicit val templateProcessor = new TemplateProcessor {
+  implicit val templateProcessor: TemplateProcessor
+
+  class ExampleTemplateProcessor extends TemplateProcessor {
     override val route: Route = templateRoute ~ super.route
   }
 }

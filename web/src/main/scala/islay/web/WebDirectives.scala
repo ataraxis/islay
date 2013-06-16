@@ -2,24 +2,23 @@ package islay.web
 
 import islay.template.TemplateProcessor
 import islay.transform.Transform
-import shapeless.{:: => ::, HNil}
-import spray.http.{HttpHeader, HttpHeaders}
+import shapeless._
+import spray.http.{HttpHeader, HttpHeaders, SingletonValueRenderable, StringRendering, Uri}
 import spray.routing.{Directive, Directive0, RequestContext, Route}
 import spray.routing.directives._
 
 
 object WebHeaders {
 
-  case class Refresh(timeout: Int, url: String) extends HttpHeader {
+  case class Refresh(timeout: Int, url: Uri) extends HttpHeader with SingletonValueRenderable {
     def name = "Refresh"
     def lowercaseName = "refresh"
-    def value = s"$timeout; url=$url"
+    override def value = s"$timeout; url=${url.render(new StringRendering)}"
   }
 
-  case class RequestAttributes(attributes: Map[String, Any]) extends HttpHeader {
+  case class RequestAttributes(attributes: Map[String, Any]) extends HttpHeader with SingletonValueRenderable {
     def name = "X-Request-Attributes"
     def lowercaseName = "x-request-attributes"
-    def value = ""
     def addAttr(name: String, value: Any) = copy(attributes = attributes + (name -> value))
   }
 }
@@ -38,9 +37,9 @@ trait WebDirectives {
   def refresh(timeout: Int, url: String): Directive0 = respondWithHeader(Refresh(timeout, url))
 
   def rewritePath(path: String): Directive0 = mapRequestContext { ctx =>
-    val q = ctx.request.rawQuery
+    val q = ctx.request.uri.query
     val uri = if (q.isEmpty) path else path + "?" + q
-    RequestContext(ctx.request.copy(uri = uri).parseUri, ctx.responder, path)
+    RequestContext(ctx.request.copy(uri = uri), ctx.responder, Uri.Path(path))
   }
 
   def flash(content: Message): Directive0 = flash('notice, content)
@@ -56,9 +55,8 @@ trait WebDirectives {
     }
   }
 
-  private def flashUrl(url: String, level: Symbol, content: Message) =
-    if (url.contains("?")) url +"&"+ encodeFlash(level, content)
-    else url +"?"+ encodeFlash(level, content)
+  private def flashUrl(url: Uri, level: Symbol, content: Message) =
+    url.copy(query = Uri.Query.Cons("!flash", encodeFlash(level, content), url.query))
 
   private def encodeFlash(level: Symbol, content: Message) = content.toString
 

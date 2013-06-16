@@ -1,22 +1,25 @@
 package islay.example
 
-import akka.actor._
-import islay.template.TemplateProcessor
-import spray.can.server.SprayCanHttpServerApp
-import spray.routing.{HttpService, HttpServiceActor, Route}
+import scala.concurrent.ExecutionContext
+
+import akka.actor.{ActorSystem, Props}
+import spray.routing.HttpService
+
 
 /**
  * Here's where we bake our cake.
  */
 trait Modules
-  extends SprayCanHttpServerApp
-  with HttpService
+  extends HttpService
   with Routes
   with TemplateRoutes
   with TemplateProcessorModule {
 
+  implicit val system = ActorSystem("example")
+  override val actorRefFactory = system
 
-  override def actorRefFactory = system
+  override implicit val executor: ExecutionContext = system.dispatcher
+  override implicit val templateProcessor = new ExampleTemplateProcessor
 
-  val service = system.actorOf(Props(HttpServiceActor(route)))
+  val service = system.actorOf(Props(new ExampleService(route)))
 }

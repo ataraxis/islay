@@ -16,12 +16,12 @@ object Dependency {
 
 
   object V { 
-    val Akka         = "2.1.0"       // Apache 2.0
+    val Akka         = "2.2.0-RC1"   // Apache 2.0
     val Caliper      = "0.5-rc1"     // Apache 2.0
     val Logback      = "1.0.9"       // EPL 1.0/LGPL 2.1
     val Parboiled    = "1.1.4"       // Apache 2.0
     val ScalaTest    = "2.0.M5b"     // Apache 2.0
-    val Spray        = "1.1-M7"      // Apache 2.0
+    val Spray        = "1.2-M8"      // Apache 2.0
     val HtmlParser   = "1.4"         // MIT
   }
 

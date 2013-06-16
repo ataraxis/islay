@@ -1,19 +1,18 @@
 package islay.template
 
 import java.nio.file.{Files, NoSuchFileException, Path}
-
 import scala.annotation.tailrec
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.util.{Failure, Success}
 import scala.xml.{Comment, Elem, NodeSeq}
-
 import akka.actor.{ActorRef, Status}
 import akka.spray.UnregisteredActorRef
 import islay.template.util.Resources
 import islay.transform.CallingThreadExecutor
 import spray.caching.LruCache
-import spray.http.{EmptyEntity, HttpBody, HttpHeader, HttpMethods, HttpProtocols, HttpRequest, HttpResponse}
+import spray.http.{EmptyEntity, HttpEntity, HttpHeader, HttpMethods, HttpProtocols, HttpRequest, HttpResponse, Rendering}
 import spray.routing.{RequestContext, Route, RouteConcatenation}
+import spray.http.SingletonValueRenderable
 
 
 case class TemplateProcessor(
@@ -32,7 +31,7 @@ case class TemplateProcessor(
 
 
   def route: Route = { context =>
-    template(context.request.path, context)
+    template(context.request.uri.path.toString, context)
   }
 
 
@@ -53,12 +52,12 @@ case class TemplateProcessor(
     if (TemplateSettings.reloadResources)
       doLookup(request)
     else
-      cache.fromFuture(request.path)(doLookup(request))
+      cache(request.uri.path.toString)(doLookup(request))
   }
 
   private def doLookup(request: HttpRequest): Future[NodeSeq] = {
     Future {
-      resolvePath(request.path)
+      resolvePath(request.uri.path.toString)
 
     } flatMap { case (path, parser) =>
       val startBytes = Resources.readAllBytes(path)
@@ -273,12 +272,12 @@ case class TemplateProcessor(
       headers = IncludeMarker :: request.headers,
       entity = EmptyEntity,
       protocol = HttpProtocols.`HTTP/1.1`
-    ).parseUri
+    )
 
     val promise = Promise[TemplateResult]
     val responder = new TemplateResponder(promise, context.responder)
 
-    val templateContext = RequestContext(templateRequest, responder, templateRequest.path)
+    val templateContext = RequestContext(templateRequest, responder, templateRequest.uri.path)
     route(templateContext)
 
     promise.future
@@ -291,7 +290,7 @@ case class TemplateProcessor(
 
 
   def format(result: TemplateResult): HttpResponse =
-    HttpResponse(entity = HttpBody(formatter.contentType, formatter.format(result)))
+    HttpResponse(entity = HttpEntity(formatter.contentType, formatter.format(result)))
 }
 
 case class TemplateResult(head: NodeSeq = NodeSeq.Empty, body: NodeSeq = NodeSeq.Empty) {
@@ -333,18 +332,16 @@ extends UnregisteredActorRef(delegate) {
  * Used by `completeTemplate()` to decide whether a response should be forwarded as a NodeSeq for
  * inclusion in the surrounding document or as the final `HttpResponse`.
  */
-private[islay] case object IncludeMarker extends HttpHeader {
+private[islay] case object IncludeMarker extends HttpHeader with SingletonValueRenderable {
   def name = "X-Islay-Include"
   def lowercaseName = "x-islay-include"
-  def value = ""
 }
 
 /**
  * Passed from `expand()` to the route for the include when a surrounding SSI pair is encountered
  * so that `lookup()` can parse both the start and end fragments as a single template.
  */
-private[islay] case class SurroundEnd(uri: String) extends HttpHeader {
+private[islay] case class SurroundEnd(uri: String) extends HttpHeader with SingletonValueRenderable {
   def name = "X-Islay-Surround-End"
   def lowercaseName = "x-islay-surround-end"
-  def value = ""
 }

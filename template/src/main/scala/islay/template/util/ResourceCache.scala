@@ -20,7 +20,7 @@ class ResourceCache[A](reapplyOnModification: Boolean) {
   def fromFuture(resource: Path)(expression: => Future[A])
       (implicit executor: ExecutionContext): Future[A] = {
 
-    val entry = cache.fromFuture(resource) {
+    val entry = cache(resource) {
       for {
         lastModified <- Future(Files.getLastModifiedTime(resource).toMillis)
         value <- expression

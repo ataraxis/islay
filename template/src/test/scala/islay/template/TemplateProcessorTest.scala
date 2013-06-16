@@ -12,6 +12,7 @@ import org.scalatest.matchers.ShouldMatchers
 import akka.actor._
 import akka.testkit.{ImplicitSender, TestKit}
 import spray.http.HttpRequest
+import spray.http.Uri.Path
 import spray.routing.Directive._
 import spray.routing._
 import spray.routing.directives._
@@ -34,21 +35,21 @@ with RouteDirectives with PathDirectives with TemplateDirectives {
   }
 
   test("A resource with a known file extension can be found at an exact path") {
-    val request = HttpRequest(uri = "index.html").parseUri
+    val request = HttpRequest(uri = "index.html")
     val processor = newProcessor
     val result = Await.result(processor.lookup(request), 1.second)
     result should equal (<html/>)
   }
 
   test("A resource can be found by appending an available file extension") {
-    val request = HttpRequest(uri = "/index").parseUri
+    val request = HttpRequest(uri = "/index")
     val processor = newProcessor
     val result = Await.result(processor.lookup(request), 1.second)
     result should equal (<html/>)
   }
 
   test("A default resource named 'index' can be found at a directory path") {
-    val request = HttpRequest(uri = "/").parseUri
+    val request = HttpRequest(uri = "/")
     val processor = newProcessor
     val result = Await.result(processor.lookup(request), 1.second)
     result should equal (<html/>)
@@ -56,7 +57,7 @@ with RouteDirectives with PathDirectives with TemplateDirectives {
 
   test("A `NoSuchFileException` failure is returned for a path that cannot be matched") {
     intercept[NoSuchFileException] {
-      val request = HttpRequest(uri = "plah").parseUri
+      val request = HttpRequest(uri = "plah")
       val processor = newProcessor
       Await.result(processor.lookup(request), 1.second)
     }
@@ -74,7 +75,7 @@ with RouteDirectives with PathDirectives with TemplateDirectives {
       }
     }
 
-    val context = RequestContext(request = HttpRequest(), responder = self)
+    val context = RequestContext(request = HttpRequest(), responder = self, unmatchedPath = Path.Empty)
 
     val f = processor.expand(ssi, context)
     val result = Await.result(f, 1.second)
@@ -85,7 +86,7 @@ with RouteDirectives with PathDirectives with TemplateDirectives {
 
     val ssi = Comment("""#include file="/buffalo"""")
     val processor = newProcessor
-    val context = RequestContext(request = HttpRequest(), responder = self)
+    val context = RequestContext(request = HttpRequest(), responder = self, unmatchedPath = Path.Empty)
 
     val nodes = <p/><div>{Comment("Pop")} {ssi}</div><br/>;
     val f = processor.expand(nodes, context)
@@ -107,7 +108,7 @@ with RouteDirectives with PathDirectives with TemplateDirectives {
     val footer = Comment("""#include file="/footer.html?!"""")
     val nodes = <div>{header}surrounded{footer}</div>
 
-    val context = RequestContext(request = HttpRequest(), responder = self)
+    val context = RequestContext(request = HttpRequest(), responder = self, unmatchedPath = Path.Empty)
 
     val f = processor.expand(nodes, context)
     val result = Await.result(f, 1.second)
@@ -126,7 +127,7 @@ with RouteDirectives with PathDirectives with TemplateDirectives {
     }
 
     val processor = newProcessor.copy(parsers = Map("html" -> parser))
-    val request = HttpRequest(uri = "/header.html", headers = List(SurroundEnd("/footer.html?!"))).parseUri
+    val request = HttpRequest(uri = "/header.html", headers = List(SurroundEnd("/footer.html?!")))
 
     val nodes = Await.result(processor.lookup(request), 1.second)
     text should equal ("<div><h1>Header</h1><boff/>!</div>")
@@ -139,7 +140,7 @@ with RouteDirectives with PathDirectives with TemplateDirectives {
       <html><head><title>Buffalo</title></head><body><head><title>Boff</title></head>Boofalu?</body></html>
 
     val processor = newProcessor
-    val context = RequestContext(request = HttpRequest(), responder = self)
+    val context = RequestContext(request = HttpRequest(), responder = self, unmatchedPath = Path.Empty)
     processor.expand(nodes, context)
 
     val f = processor.expand(nodes, context)

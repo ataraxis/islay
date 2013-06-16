@@ -7,7 +7,7 @@ object SubmittedValue {
 
   def extractAll(request: HttpRequest): Map[String, SubmittedValue] = request.entity match {
     case EmptyEntity if request.method == HttpMethods.GET =>
-      request.parseQuery.queryParams map { case (name, value) => (name, TextValue(value)) }
+      request.uri.query.map { case (name, value) => (name, TextValue(value)) }.toMap
     case e: HttpBody =>
       import spray.httpx.unmarshalling._
       e.as[HttpForm] match {

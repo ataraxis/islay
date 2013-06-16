@@ -34,7 +34,7 @@ trait TemplateDirectives {
 
   def template(path: String, ctx: RequestContext)
       (implicit executor: ExecutionContext, processor: TemplateProcessor) {
-    val request = ctx.request.copy(uri = path).parseUri
+    val request = ctx.request.copy(uri = path)
     val f = for {
       nodes <- processor.lookup(request)
       expanded <- processor.expand(nodes, ctx)

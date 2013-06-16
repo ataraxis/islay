@@ -3,6 +3,7 @@ package islay.example.pages
 import islay.example.TemplateProcessorModule
 import islay.example.dao.UserDaoModule
 import islay.example.model.User
+import islay.transform._
 import islay.web.{Form, FormPage, Message, WebDirectives}
 import islay.web.components.{SubmitButton, TextInput}
 import spray.http.StatusCodes
