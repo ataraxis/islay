@@ -1,7 +1,8 @@
 package islay.example
 
 import islay.example.pages.{UserDetailPageModule, UsersPageModule}
-import spray.routing._
+import islay.web.Directives
+import spray.routing.Route
 
 
 trait Routes
@@ -17,9 +18,10 @@ trait Routes
       dynamic(usersPage)
     } ~
     path("user" / Segment) { username =>
-      rewritePath("user") {
+      rewritePath("/user") {
         userDetailPage(username)
       }
-    }
+    } ~
+    defaultRoute
   )
 }

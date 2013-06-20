@@ -41,8 +41,6 @@ trait TemplateDirectives {
     } yield expanded
     complete(f, ctx)
   }
-
-  def originalContext: Directive[RequestContext :: HNil] = ???
 }
 
 object TemplateDirectives extends TemplateDirectives

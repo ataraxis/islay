@@ -4,8 +4,10 @@ import islay.template.TemplateProcessor
 import islay.transform.Transform
 import shapeless._
 import spray.http.{HttpHeader, HttpHeaders, SingletonValueRenderable, StringRendering, Uri}
-import spray.routing.{Directive, Directive0, RequestContext, Route}
+import spray.routing.{Directive, Directive0, RequestContext, Route, RouteConcatenation}
 import spray.routing.directives._
+import islay.template.util.Resources
+import islay.template.TemplateSettings
 
 
 object WebHeaders {
@@ -26,20 +28,18 @@ object WebHeaders {
 trait WebDirectives {
   import BasicDirectives._
   import MiscDirectives._
+  import PathDirectives._
   import RespondWithDirectives._
   import WebHeaders._
-
-  def page(t: Transform)(implicit processor: TemplateProcessor): Route =
-    new Page { override def transform = t }
 
   def refresh(url: String): Directive0 = refresh(0, url)
 
   def refresh(timeout: Int, url: String): Directive0 = respondWithHeader(Refresh(timeout, url))
 
   def rewritePath(path: String): Directive0 = mapRequestContext { ctx =>
-    val q = ctx.request.uri.query
-    val uri = if (q.isEmpty) path else path + "?" + q
-    RequestContext(ctx.request.copy(uri = uri), ctx.responder, Uri.Path(path))
+    val absolutePath = if (path startsWith "/") path else "/"+ path
+    val uri = ctx.request.uri.copy(path = Uri.Path(absolutePath))
+    RequestContext(ctx.request.copy(uri = uri), ctx.responder, uri.path)
   }
 
   def flash(content: Message): Directive0 = flash('notice, content)

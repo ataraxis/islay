@@ -133,12 +133,17 @@ object Dependencies {
     Compile.akkaActor,
     Compile.logbackClassic,
     Compile.sprayCaching,
-    Compile.sprayRouting
+    Compile.sprayRouting,
+    Compile.webjarsLocator
   )
   val webTestkit = baseTestkit ++ Seq(Test.sprayTestkit)
 
   val benchmark = Seq(Compile.caliper)
 
-  val example = Seq(Compile.sprayCan)
+  val example = Seq(
+    Compile.sprayCan,
+    Runtime.bootstrap,
+    Runtime.jQuery
+  )
   val exampleTestkit = baseTestkit ++ Seq(Test.sprayTestkit)
 }

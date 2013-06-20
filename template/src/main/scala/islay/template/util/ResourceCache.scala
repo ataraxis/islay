@@ -7,18 +7,30 @@ import scala.concurrent.{ExecutionContext, Future}
 import spray.caching.LruCache
 
 
+object ResourceCache {
+  case class Entry[A](lastModified: Long, value: A)
+}
+
+
 /**
  * A wrapper around Spray's `LruCache` for resources which checks the last modified time of the
  * resource and re-applies the cached expression on modification.
  */
 class ResourceCache[A](reapplyOnModification: Boolean) {
 
+  import ResourceCache._
+
   val cache = LruCache[Entry[A]]()
 
-  case class Entry[A](lastModified: Long, value: A)
 
-  def fromFuture(resource: Path)(expression: => Future[A])
+  def apply(resource: Path)(expression: => Future[A])
       (implicit executor: ExecutionContext): Future[A] = {
+
+    entry(resource)(expression).map(_.value)
+  }
+
+  def entry(resource: Path)(expression: => Future[A])
+      (implicit executor: ExecutionContext): Future[Entry[A]] = {
 
     val entry = cache(resource) {
       for {
@@ -32,13 +44,13 @@ class ResourceCache[A](reapplyOnModification: Boolean) {
         val lastModified = Files.getLastModifiedTime(resource).toMillis
         if (lastModified > entry.lastModified) {
           cache.remove(resource)
-          fromFuture(resource)(expression)
+          this.entry(resource)(expression)
         }
         else
-          Future.successful(entry.value)
+          Future.successful(entry)
       }
     }
     else
-      entry.map(_.value)
+      entry
   }
 }

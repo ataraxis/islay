@@ -33,7 +33,7 @@ class MessageResourceLoader(basePath: Path, reloadResources: Boolean) {
     val notFound = Future.failed[MessageProps](new NoSuchFileException(name))
 
     paths(name, locales).foldLeft(notFound) { case (acc, (path, locale)) =>
-      orElse(acc, cache.fromFuture(path)(loadResource(path, locale)))
+      orElse(acc, cache(path)(loadResource(path, locale)))
     }
   }
 
