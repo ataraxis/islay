@@ -40,6 +40,20 @@ class Html5Parser extends Parser {
       hStack.push(Comment(ch.mkString))
     }
 
+
+    /* only minimize void tags */
+    override def create(pre: String, label: String, attrs: MetaData, scope: NamespaceBinding, children: Seq[Node]): Elem =
+       Elem(pre, label, attrs, scope, voidTags.contains(label), children: _*)
+
+    /* only minimize void tags */
+    override def createNode(pre: String, label: String, attrs: MetaData, scope: NamespaceBinding, children: List[Node]): Elem =
+      Elem(pre, label, attrs, scope, voidTags.contains(label), children: _*)
+
+    private val voidTags = Set(
+      "area", "base", "br", "col", "command", "embed", "hr", "img", "input",
+      "keygen", "link", "meta", "param", "source", "track", "wbr"
+    )
+
     /**
      * The parsed document stripped of auto-inserted html, head and body tags. By the location of
      * `<!--islay-marker-->` we can tell whether an html or body tag was inserted. Let's handle
@@ -55,12 +69,13 @@ class Html5Parser extends Parser {
      */
     def result: NodeSeq = {
 
-      /* no sure way to check if head was auto-inserted */
-      def autoInsertedHead(node: Node) =
-        node.label == "head" && node.child.isEmpty && node.attributes == Null
+      /* no sure way to check if head or body was auto-inserted */
+      def autoInserted(label: String, node: Node) =
+        node.label == label && node.child.isEmpty && node.attributes == Null
 
-      def userInsertedHead(node: Node) =
-        node.label == "head" && !autoInsertedHead(node)
+      def userInserted(label: String, node: Node) =
+        node.label == label && !autoInserted(label, node)
+
 
       val nodes = hStack.reverse
       nodes.last match {
@@ -69,19 +84,19 @@ class Html5Parser extends Parser {
         case _ =>
           nodes flatMap {
             case html: Elem if html.label == "html" =>
-              html.child.last match {
+              html.child collectFirst {
                 case Comment("islay-marker") =>
-                  html.child.filterNot(autoInsertedHead).dropRight(1)
-                case _ =>
-                  html.child collectFirst {
-                    case body: Elem if body.label == "body" =>
-                      body.child.last match {
-                        case Comment("islay-marker") =>
-                          html.child.filter(userInsertedHead) ++ body.child.dropRight(1)
-                        case _ =>
-                          sys.error("Couldn't find islay-marker in auto-inserted markup")
-                      }
-                  } getOrElse sys.error("Missing auto-inserted body element")
+                  html.child filter { n => userInserted("head", n) || userInserted("body", n) }
+              } getOrElse {
+                html.child collectFirst {
+                  case body: Elem if body.label == "body" =>
+                    body.child.lastOption match {
+                      case Some(Comment("islay-marker")) =>
+                        html.child.filter(userInserted("head", _)) ++ body.child.dropRight(1)
+                      case _ =>
+                        sys.error("Couldn't find islay-marker in auto-inserted markup")
+                    }
+                } getOrElse sys.error("Missing auto-inserted body element")
               }
             case n => n
           }

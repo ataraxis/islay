@@ -47,4 +47,11 @@ class Html5ParserTest extends FunSuite with ShouldMatchers {
 
     ns.toString should equal ("<head><title>Foo</title></head>Hello")
   }
+
+  test("Non-void tags are not minimized") {
+    val bytes = """<head><script src="jquery.js"></script></head>""".getBytes
+    val ns = parser.parse(bytes)
+
+    ns.toString should equal ("""<head><script src="jquery.js"></script></head>""")
+  }
 }
