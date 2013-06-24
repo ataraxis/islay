@@ -94,7 +94,7 @@ class Html5Parser extends Parser {
                       case Some(Comment("islay-marker")) =>
                         html.child.filter(userInserted("head", _)) ++ body.child.dropRight(1)
                       case _ =>
-                        sys.error("Couldn't find islay-marker in auto-inserted markup")
+                        sys.error("Couldn't find islay-marker in auto-inserted markup (unclosed script tag?)")
                     }
                 } getOrElse sys.error("Missing auto-inserted body element")
               }
