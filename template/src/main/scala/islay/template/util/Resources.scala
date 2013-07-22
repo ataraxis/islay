@@ -5,10 +5,11 @@ import java.lang.UnsupportedOperationException
 import java.nio.ByteBuffer
 import java.nio.channels.{AsynchronousFileChannel, CompletionHandler}
 import java.nio.file.{FileSystems, Files, InvalidPathException, Path}
-
 import scala.annotation.tailrec
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.util.{Failure, Success}
+import java.net.URI
+import java.nio.file.FileSystemAlreadyExistsException
 
 
 object Resources {
@@ -28,8 +29,14 @@ object Resources {
       if (contextUri.getScheme == "file")
         (contextUri.getPath, FileSystems.getFileSystem(contextUri.resolve("/")))
       else
-        (context, FileSystems.newFileSystem(contextUri, new java.util.HashMap[String, Nothing]))
+        (context, nonFileSystem(contextUri))
     fs.getPath(contextPath)
+  }
+
+  private def nonFileSystem(uri: URI)= try {
+    FileSystems.newFileSystem(uri, new java.util.HashMap[String, Nothing])
+  } catch { case _: FileSystemAlreadyExistsException =>
+    FileSystems.getFileSystem(uri)
   }
 
   /**
