@@ -14,9 +14,7 @@ trait Routes
 
 
   def route: Route = (
-    path("users") {
-      dynamic(usersPage)
-    } ~
+    path("users")(usersPage) ~
     path("user" / Segment) { username =>
       rewritePath("/user") {
         userDetailPage(username)

@@ -1,6 +1,5 @@
 package islay.template
 
-import TemplateDirectives.complete
 import islay.transform.CallingThreadExecutor
 import islay.transform.Transform
 import spray.http.HttpMethods
@@ -11,8 +10,6 @@ trait TemplateBinding extends Route with DelayedInit {
 
   @volatile private[this] var context: RequestContext = null
   private[islay] def setContext(context: RequestContext) {
-    if (this.context != null)
-      throw new IllegalStateException("Template bindings cannot be shared across requests. Try using the dynamic directive.")
     this.context = context
   }
 
@@ -26,7 +23,7 @@ trait TemplateBinding extends Route with DelayedInit {
 
   @volatile private[this] var body: () => Unit = _
 
-  override def delayedInit(body: => Unit) {
+  override def delayedInit(body: => Unit): Unit = {
     this.body = body _
   }
 
@@ -40,27 +37,28 @@ trait TemplateBinding extends Route with DelayedInit {
    */
   def transform: Transform
 
-  def apply(context: RequestContext) {
+  def apply(context: RequestContext): Unit = {
     context.request.method match {
       case HttpMethods.GET =>
         init(context)
-        bind()
+        complete(context)
       case _ =>
         context.reject()
     }
   }
 
-  private[islay] def init(context: RequestContext) {
-    setContext(context)
+  private[islay] def init(context: RequestContext): Unit = {
+    if (this.context != null)
+      throw new IllegalStateException("Template bindings cannot be shared across requests. Try using the dynamic directive.")
+    this.context = context
     val b = body
     if (b != null) b()
   }
 
-  private[islay] def bind() {
-    import TemplateDirectives._
+  def complete(context: RequestContext): Unit = {
     import CallingThreadExecutor.Implicit
 
-    val context = this.context
+    this.context = context
 
     val f = for {
       template <- processor.lookup(context.request)
@@ -68,6 +66,6 @@ trait TemplateBinding extends Route with DelayedInit {
       expanded <- processor.expand(nodes, context)
     } yield expanded
 
-    complete(f, context)
+    TemplateDirectives.complete(f, context)
   }
 }

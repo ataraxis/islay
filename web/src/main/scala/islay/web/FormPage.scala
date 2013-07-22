@@ -2,6 +2,8 @@ package islay.web
 
 import spray.http.HttpMethods
 import spray.routing.RequestContext
+import scala.util.Success
+import scala.util.Failure
 
 
 trait FormPage extends Page {
@@ -9,7 +11,7 @@ trait FormPage extends Page {
   val form: Form
 
 
-  override def apply(context: RequestContext) {
+  override def apply(context: RequestContext): Unit = {
     super.init(context)
     form.complete()
     context.request.method match {
@@ -17,9 +19,18 @@ trait FormPage extends Page {
       case _ =>
         /* TODO: check CSRF token */
     }
-    form.process() match {
-      case Some(route) => route.apply(context)
-      case None => super.bind()
+
+    implicit val ec = processor.executor
+    form.process onComplete {
+      case Failure(ex) =>
+        context.failWith(ex)
+      case Success(Right(route)) =>
+        route.apply(context)
+      case Success(Left(errors)) =>
+        val ctx = context.withRequestMapped { request =>
+          WebHeaders.addMessages(request, 'error, errors)
+        }
+        super.complete(ctx)
     }
   }
 }

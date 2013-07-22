@@ -1,18 +1,19 @@
 package islay.template
 
 import java.nio.file.{Files, NoSuchFileException, Path}
+
 import scala.annotation.tailrec
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.util.{Failure, Success}
 import scala.xml.{Comment, Elem, NodeSeq}
+
 import akka.actor.{ActorRef, Status}
 import akka.spray.UnregisteredActorRef
 import islay.template.util.Resources
 import islay.transform.CallingThreadExecutor
 import spray.caching.LruCache
-import spray.http.{EmptyEntity, HttpEntity, HttpHeader, HttpMethods, HttpProtocols, HttpRequest, HttpResponse, Rendering}
+import spray.http.{EmptyEntity, HttpEntity, HttpHeader, HttpMethods, HttpProtocols, HttpRequest, HttpResponse, SingletonValueRenderable}
 import spray.routing.{RequestContext, Route, RouteConcatenation}
-import spray.http.SingletonValueRenderable
 
 
 case class TemplateProcessor(

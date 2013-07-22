@@ -5,24 +5,24 @@ import java.util.Locale
 import scala.concurrent.{ExecutionContext, Future}
 import scala.xml.{Attribute, Elem, NodeSeq, Null, Text}
 
+import islay.web.Error
 import spray.http.HttpRequest
 
 
 object TextInput {
 
-  def apply[A](default: A, required: Boolean = false, validator: (A => Unit) = { _: A => () })
-      (implicit tc: FieldConverter[A], r: HttpRequest, ls: Seq[Locale], e: ExecutionContext): TextInput[A] = {
+  def apply[A](default: A)(required: Boolean = false, validator: (A => Error) = { _: A => Error.Empty })
+      (implicit fc: FieldConverter[A], ls: Seq[Locale], e: ExecutionContext): TextInput[A] = {
     new TextInput(default, required, validator)
   }
 }
 
 class TextInput[A] private (
     override val default: A,
-    required: Boolean,
-    validator: (A => Unit)
+    override val required: Boolean,
+    override val validator: (A => Error)
 )(implicit
-    tc: FieldConverter[A],
-    r: HttpRequest,
+    fc: FieldConverter[A],
     ls: Seq[Locale],
     executor: ExecutionContext
 ) extends ValueComponent[A] {

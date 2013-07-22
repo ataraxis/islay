@@ -12,7 +12,6 @@ import spray.routing.HttpService
 trait Modules
   extends HttpService
   with Routes
-  with TemplateRoutes
   with TemplateProcessorModule {
 
   implicit val system = ActorSystem("example")

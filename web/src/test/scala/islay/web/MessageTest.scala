@@ -39,7 +39,7 @@ class MessageTest extends FunSuite with ShouldMatchers {
 
   test("Missing message warnings are properly escaped") {
     val f = Message("orge", "<script>").toNodeSeq
-    Await.result(f, 2.seconds).toString should equal ("???orge???(&lt;script&gt;)")
+    Await.result(f, 2.seconds).toString should equal ("???messages:orge???(&lt;script&gt;)")
   }
 
   test("NodeSeq arguments are not escaped") {

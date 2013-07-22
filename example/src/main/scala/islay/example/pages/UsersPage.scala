@@ -4,12 +4,13 @@ import islay.example.TemplateProcessorModule
 import islay.example.dao.UserDaoModule
 import islay.transform._
 import islay.web.{Message, Page}
+import spray.routing.Route
 
 
 trait UsersPageModule extends UserDaoModule with TemplateProcessorModule {
 
 
-  def usersPage: UsersPage = new UsersPage
+  def usersPage: Route = dynamic(new UsersPage)
 
   class UsersPage extends Page {
 

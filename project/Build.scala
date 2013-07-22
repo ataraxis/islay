@@ -68,7 +68,7 @@ object Settings {
 
   lazy val defaultSettings = Defaults.defaultSettings ++ buildSettings ++ Seq(
     resolvers       ++= Dependency.resolutionRepos,
-    scalaVersion    := "2.10.1",
+    scalaVersion    := "2.10.2",
     scalacOptions   ++= Seq("-encoding", "UTF-8", "-deprecation", "-unchecked", "-feature")
   )
 

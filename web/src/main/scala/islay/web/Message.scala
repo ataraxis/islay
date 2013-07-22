@@ -12,8 +12,30 @@ import spray.http.HttpHeaders.`Accept-Language`
 import spray.http.HttpRequest
 
 
-case class Message(key: String, args: Any*)
-    (implicit bundle: Bundle, locales: Seq[Locale], executor: ExecutionContext) extends Renderable {
+object Message {
+
+  /**
+   * Returns a Message that will produce an internationalized string when rendered using the given
+   * key and arguments. Without specifying a value for `bundle`, messages will be resolved in
+   * "messages.props".
+   */
+  def apply(key: String, args: Any*)
+      (implicit bundle: Bundle[Message], locales: Seq[Locale], executor: ExecutionContext) =
+    new Message(bundle, key, args: _*)
+
+  implicit object Bundle extends Bundle[Message]("messages")
+}
+
+
+/**
+ * A factory that will produce internationalized strings from a properties file when rendered. The
+ * properties file is located through `MessageResourceLoader.lookup` using the name from the
+ * provided bundle. The property found by the provided key will then be formatted using Java's
+ * `MessageFormat` with the provided format arguments. Futures, Options, NodeSeqs, and other
+ * Messages may be safely given as format arguments.
+ */
+class Message(bundle: Bundle[_], key: String, args: Any*)
+    (implicit locales: Seq[Locale], executor: ExecutionContext) extends Renderable {
 
 
   override def toNodeSeq: Future[NodeSeq] = {
@@ -30,10 +52,10 @@ case class Message(key: String, args: Any*)
           }
         case None =>
           if (args.isEmpty)
-            Future.successful(Text("???"+ key +"???"))
+            Future.successful(Text("???"+ bundle.name +":"+ key +"???"))
           else
             Future.sequence(args.map(formatArg)) map { args =>
-              Unparsed("???"+ key +"???("+ args.mkString(",") +")")
+              Unparsed("???"+ bundle.name +":"+ key +"???("+ args.mkString(",") +")")
             }
       }
     }
@@ -51,14 +73,22 @@ case class Message(key: String, args: Any*)
       case _ => Future.successful(Utility.escape(arg.toString))
     }
   }
+
+  override def toString(): String =
+    key +"("+ args.mkString(",") +")"
 }
 
 
-object Bundle {
-  implicit val messages = Bundle("messages")
+/**
+ * A non-internationalized message.
+ */
+case class FixedMessage(message: NodeSeq) extends Message(null, null)(null, null) {
+  override def toNodeSeq: Future[NodeSeq] = Future.successful(message)
+  override def toString: String = message.toString
 }
 
-case class Bundle(name: String)
+
+class Bundle[A](val name: String)
 
 
 object Locales {
