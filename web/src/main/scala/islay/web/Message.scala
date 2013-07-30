@@ -24,6 +24,54 @@ object Message {
     new Message(bundle, key, args: _*)
 
   implicit object Bundle extends Bundle[Message]("messages")
+
+  /**
+   * Returns a Message deserialized from the given string that was serialized using
+   * `Message.serialize`.
+   */
+  def deserialize(value: String)(implicit locales: Seq[Locale], executor: ExecutionContext): (Symbol, Message) = {
+    split(value) match {
+      case level +: bundle +: key +: args =>
+        val safeBundle = bundle.replaceAll("[^\\w\\d-.]", "")
+        Symbol(level) -> new Message(new Bundle(safeBundle), key, args.map(deserializeArg): _*)
+      case _ =>
+        'error -> FixedMessage(<span>Invalid flash parameter: <cite>{value}</cite></span>)
+    }
+  }
+
+  private def split(value: String): Seq[String] = {
+    val sb = new StringBuilder
+    var seq = Vector[String]()
+    var escaped = false
+    var i = 0
+    while (i < value.length) {
+      value.charAt(i) match {
+        case '\\' if !escaped =>
+          escaped = true
+        case c if escaped =>
+          sb.append(c)
+          escaped = false
+        case '~' =>
+          seq :+= sb.toString
+          sb.clear()
+        case c =>
+          sb.append(c)
+      }
+      i += 1
+    }
+    if (!sb.isEmpty)
+      seq :+= sb.toString
+    seq
+  }
+
+  private val ArgPattern = "([id]?):(.*)".r
+
+  private def deserializeArg(arg: Any): Any = arg match {
+    case ArgPattern("d", value) => value.toDouble
+    case ArgPattern("i", value) => value.toLong
+    case ArgPattern("", value) => value
+    case _ => "Cheesewiz"
+  }
 }
 
 
@@ -74,8 +122,36 @@ class Message(bundle: Bundle[_], key: String, args: Any*)
     }
   }
 
+  /**
+   * Returns a serialized representation that is safe to be passed between client and server (and
+   * therefore suitable for flash storage).
+   */
+  def serialize(level: Symbol): Future[String] = {
+    import CallingThreadExecutor.Implicit
+    Future.sequence(args.map(serializeArg)) map { args =>
+      level.name +"~"+ bundle.name +"~"+ key +"~"+ args.mkString("~")
+    }
+  }
+
+  private def serializeArg(arg: Any): Future[String] = {
+    import CallingThreadExecutor.Implicit
+    arg match {
+      case null => Future.successful(":null")
+      case None => Future.successful(":")
+      case Some(a) => serializeArg(a)
+      case f: Future[_] => f.flatMap(serializeArg)
+      case _: Int | _: Long | _: Short | _: Byte => Future.successful("i:"+ arg)
+      case _: Float | _: Double => Future.successful("d:"+ arg)
+      case a => Future.successful(":"+ escapeForSerialization(a.toString))
+    }
+  }
+
+  private def escapeForSerialization(arg: String): String = {
+    Utility.escape(arg).replaceAll("([~\\\\])", "\\\\$1")
+  }
+
   override def toString(): String =
-    key +"("+ args.mkString(",") +")"
+    bundle +":"+ key +"("+ args.mkString(",") +")"
 }
 
 
@@ -88,7 +164,9 @@ case class FixedMessage(message: NodeSeq) extends Message(null, null)(null, null
 }
 
 
-class Bundle[A](val name: String)
+class Bundle[A](val name: String) {
+  override def toString = name
+}
 
 
 object Locales {

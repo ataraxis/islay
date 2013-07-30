@@ -20,13 +20,13 @@ object Binder {
 //      value.fold(Future successful NodeSeq.Empty)(_.bindTo(elem))
 //  }
 //
-//  implicit object TraversableBinder extends Binder[Traversable[Bindable]] {
-//    override def bind(value: Traversable[Bindable], elem: Elem): Future[NodeSeq] = {
-//      import CallingThreadExecutor.Implicit
-//      val seq = value.toIndexedSeq.map(_.bindTo(elem))
-//      Future.sequence(seq).map(_.flatten)
-//    }
-//  }
+  implicit object TraversableBinder extends Binder[Traversable[Bindable]] {
+    override def bind(value: Traversable[Bindable], elem: Elem): Future[NodeSeq] = {
+      import CallingThreadExecutor.Implicit
+      val seq = value.toIndexedSeq.map(_.bindTo(elem))
+      Future.sequence(seq).map(_.flatten)
+    }
+  }
 
   implicit def rendererBinder[A](implicit delegate: Renderer[A]): Binder[A] =
     new Binder[A] {
@@ -40,12 +40,12 @@ object Binder {
         value.fold(Future successful NodeSeq.Empty)(delegate.bind(_, elem))
     }
 
-  implicit def seqBinder[A](implicit delegate: Binder[A]): Binder[Seq[A]] =
-    new Binder[Seq[A]] {
-      override def bind(value: Seq[A], elem: Elem): Future[NodeSeq] = {
-        import CallingThreadExecutor.Implicit
-        val seq = value.toIndexedSeq.map(delegate.bind(_, elem))
-        Future.sequence(seq).map(_.flatten)
-      }
-    }
+//  implicit def seqBinder[A](implicit delegate: Binder[A]): Binder[Seq[A]] =
+//    new Binder[Seq[A]] {
+//      override def bind(value: Seq[A], elem: Elem): Future[NodeSeq] = {
+//        import CallingThreadExecutor.Implicit
+//        val seq = value.toIndexedSeq.map(delegate.bind(_, elem))
+//        Future.sequence(seq).map(_.flatten)
+//      }
+//    }
 }

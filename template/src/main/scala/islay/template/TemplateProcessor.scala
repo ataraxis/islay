@@ -111,10 +111,8 @@ case class TemplateProcessor(
    * content.
    */
   def expand(nodes: NodeSeq, context: RequestContext): Future[TemplateResult] = {
-    /* remove temporary routing/lookup headers so that they don't apply recursively */
-    val filteredHeaders = context.request.headers filterNot { h =>
-      h.isInstanceOf[SurroundEnd] || h == IncludeMarker
-    }
+    /* remove temporary headers so that they don't apply recursively */
+    val filteredHeaders = context.request.headers.filterNot(_.isInstanceOf[SurroundEnd])
     val filteredRequest = context.request.copy(headers = filteredHeaders)
     val filteredContext = context.copy(request = filteredRequest)
 
@@ -267,10 +265,11 @@ case class TemplateProcessor(
 
   private def resolveInclude(ssiUri: String, context: RequestContext): Future[TemplateResult] = {
     val request = context.request
+    val newHeaders = ParentRequest(request) :: request.headers.filterNot(_.isInstanceOf[ParentRequest])
     val templateRequest = request.copy(
       method = HttpMethods.GET,
       uri = ssiUri,
-      headers = IncludeMarker :: request.headers,
+      headers = newHeaders,
       entity = EmptyEntity,
       protocol = HttpProtocols.`HTTP/1.1`
     )
@@ -330,12 +329,13 @@ extends UnregisteredActorRef(delegate) {
 }
 
 /**
- * Used by `completeTemplate()` to decide whether a response should be forwarded as a NodeSeq for
+ * Used by `originalRequest` to retrieve the outermost request from a template request. Also used
+ * by `completeTemplate()` to decide whether a response should be forwarded as a NodeSeq for
  * inclusion in the surrounding document or as the final `HttpResponse`.
  */
-private[islay] case object IncludeMarker extends HttpHeader with SingletonValueRenderable {
-  def name = "X-Islay-Include"
-  def lowercaseName = "x-islay-include"
+private[islay] case class ParentRequest(request: HttpRequest) extends HttpHeader with SingletonValueRenderable {
+  def name = "X-Parent-Request"
+  def lowercaseName = "x-parent-request"
 }
 
 /**
