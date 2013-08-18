@@ -46,21 +46,46 @@ abstract class Form(implicit request: HttpRequest) extends Bindable {
     Future.sequence(fs) map { _.toSeq.flatten }
   }
 
+  def isWithoutFieldErrors: Future[Boolean] = {
+    fieldErrors.map(_.isEmpty)(CallingThreadExecutor)
+  }
+
+  private def errors: Future[Seq[Message]] = {
+    import CallingThreadExecutor.Implicit
+    for {
+      fes <- fieldErrors
+      es <- validate.errors
+    } yield fes ++ es
+  }
+
   /**
-   * Returns either the field errors for this form if validation failed or the route returned from
-   * the clicked submit button.
+   * User-overrideable method to produce additional form errors not associated with any field. To
+   * only produce errors if there are no field errors, `isWithoutFieldErrors` can be used:
+   *
+   * {{{
+   * Error.text("Login failed") when (isWithoutFieldErrors) and {
+   *   authenticate(username.value, password.value).isEmpty
+   * }
+   * }}}
+   */
+  def validate: Error = Error.Empty
+
+  /**
+   * Returns either the errors for this form if validation failed or the route returned from the
+   * clicked submit button.
    */
   def process(implicit executor: ExecutionContext): Future[Either[Seq[Message], Route]] = {
-    fieldErrors map {
-      case Nil =>
-        fields collectFirst {
-          case (name, button: SubmitButton) if submittedValues.contains(name) =>
-            Right(button.route)
-        } getOrElse {
-          Left(Nil)
+    val submitButton = fields collectFirst {
+      case (name, button: SubmitButton) if submittedValues.contains(name) =>
+        button
+    }
+    submitButton match {
+      case None => Future successful Left(Nil)
+      case Some(button) =>
+        errors map {
+          case Nil => Right(button.route)
+          case errors => Left(errors)
         }
-      case errors =>
-        Left(errors)
     }
   }
 }

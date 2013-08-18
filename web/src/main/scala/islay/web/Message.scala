@@ -151,7 +151,8 @@ class Message(bundle: Bundle[_], key: String, args: Any*)
   }
 
   override def toString(): String =
-    bundle +":"+ key +"("+ args.mkString(",") +")"
+    if (args.isEmpty) bundle +":"+ key
+    else bundle +":"+ key +"("+ args.mkString(",") +")"
 }
 
 

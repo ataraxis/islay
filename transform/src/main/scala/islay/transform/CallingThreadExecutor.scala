@@ -10,6 +10,18 @@ object CallingThreadExecutor extends ExecutionContext {
 
   implicit val Implicit = this
 
-  def reportFailure(t: Throwable) { throw t }
-  def execute(runnable: Runnable) { runnable.run() }
+  def reportFailure(t: Throwable) {
+    Thread.getDefaultUncaughtExceptionHandler match {
+      case null => t.printStackTrace()
+      case handler => handler.uncaughtException(Thread.currentThread, t)
+    }
+  }
+
+  def execute(runnable: Runnable) {
+    try {
+      runnable.run()
+    } catch { case t: Throwable =>
+      reportFailure(t)
+    }
+  }
 }

@@ -26,7 +26,7 @@ class WebHeadersTest extends FunSuite with ShouldMatchers {
     val fut = addFlashMessage(response, 'notice, message)
     val resp = Await.result(fut, 3.seconds)
     val url = resp.headers.collectFirst { case Location(url) => url }.get
-    println("url = "+ url)
+
     val req = HttpRequest(uri = url)
     val Seq(decoded) = flashMessages(req)('notice)
     Await.result(decoded.toNodeSeq, 3.seconds)

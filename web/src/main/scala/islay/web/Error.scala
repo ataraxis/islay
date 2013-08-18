@@ -2,7 +2,7 @@ package islay.web
 
 import java.util.Locale
 
-import scala.annotation.tailrec
+import scala.annotation.{implicitNotFound, tailrec}
 import scala.concurrent.{ExecutionContext, Future}
 import scala.xml.{NodeSeq, Text}
 
@@ -43,6 +43,7 @@ object Error {
 
 
   private sealed abstract class ProtoMessage {
+    def build: Message
     def build(fieldName: String, fieldValue: String): FieldError
   }
 
@@ -54,6 +55,7 @@ object Error {
       implicit val locales: Seq[Locale],
       implicit val executor: ExecutionContext
   ) extends ProtoMessage {
+    def build: Message = new Message(errorBundle, key, args: _*)
     def build(name: String, value: String): FieldError =
       new Message(errorBundle, key, (FieldName(name) +: value +: args): _*) with FieldError {
         override def fieldName = name
@@ -61,6 +63,7 @@ object Error {
   }
 
   private class FixedProtoMessage(message: NodeSeq) extends ProtoMessage {
+    def build: Message = new FixedMessage(message)
     def build(name: String, value: String): FieldError = new FixedMessage(message) with FieldError {
       override def fieldName = name
     }
@@ -83,7 +86,14 @@ class Error private (
   /**
    * Returns a FieldError message for each failure (where `when` was given `true`) in the chain.
    */
-  def failureMessages(name: String, value: String): Future[Seq[FieldError]] = {
+  def fieldErrors(name: String, value: String): Future[Seq[FieldError]] = buildMessages(_.build(name, value))
+
+  /**
+   * Returns a Message for each failure (where `when` was given `true`) in the chain.
+   */
+  def errors: Future[Seq[Message]] = buildMessages(_.build)
+
+  private def buildMessages[A <: Message](f: Error.ProtoMessage => A): Future[Seq[A]] = {
     import CallingThreadExecutor.Implicit
     val fs = toSeq map { e =>
       e.isFailure map { b =>
@@ -92,7 +102,7 @@ class Error private (
     }
     Future.sequence(fs) map { ms =>
       ms collect {
-        case (true, message) => message.build(name, value)
+        case (true, message) => f(message)
       }
     }
   }
@@ -112,16 +122,38 @@ class Error private (
     new Error(other.message, other.isFailure, this)
 
   /**
-   * Filters this error based on a condition. If the condition is false then an failure message
+   * Filters this error based on a condition. If the condition is false then a failure message
    * will not be produced.
    */
   def when(condition: Boolean): Error =
     new Error(message, Future.successful(condition), next)
 
   /**
-   * Filters this error based on a future condition. If the condition is false then an failure
+   * Filters this error based on a future condition. If the condition is false then a failure
    * message will not be produced.
    */
   def when(condition: Future[Boolean]): Error =
     new Error(message, condition, next)
+
+  /**
+   * Filters this error based on the conjunction of the current failure status and the provided
+   * condition. If either the current failure status or the new condition is false then a failure
+   * message will not be produced.
+   */
+  def and(condition: Boolean): Error =
+    new Error(message, isFailure.map(_ && condition)(CallingThreadExecutor), next)
+
+  /**
+   * Filters this error based on the conjunction of the current failure status and a future
+   * condition. If either the current failure status or the future condition is false then a
+   * failure message will not be produced.
+   */
+  def and(condition: Future[Boolean]): Error = {
+    import CallingThreadExecutor.Implicit
+    val conjunction = for {
+      first <- isFailure
+      second <- condition
+    } yield first && second
+    new Error(message, conjunction, next)
+  }
 }
