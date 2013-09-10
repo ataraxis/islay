@@ -10,12 +10,13 @@ import scala.xml.NodeSeq
 import org.scalatest.FunSuite
 import org.scalatest.matchers.ShouldMatchers
 
-import WebHeaders._
 import spray.http.{HttpRequest, HttpResponse}
 import spray.http.HttpHeaders.Location
 
 
-class WebHeadersTest extends FunSuite with ShouldMatchers {
+class WebDirectivesTest extends FunSuite with ShouldMatchers {
+
+  import WebDirectives._
 
   val response = HttpResponse(headers = Location("somewhere") :: Nil)
   implicit val locales = Seq(new Locale("en"))
@@ -28,7 +29,8 @@ class WebHeadersTest extends FunSuite with ShouldMatchers {
     val url = resp.headers.collectFirst { case Location(url) => url }.get
 
     val req = HttpRequest(uri = url)
-    val Seq(decoded) = flashMessages(req)('notice)
+    val ctx = WebContext.from(req)
+    val Seq(decoded) = ctx.flashNotices
     Await.result(decoded.toNodeSeq, 3.seconds)
   }
 
@@ -59,7 +61,8 @@ class WebHeadersTest extends FunSuite with ShouldMatchers {
   test("Path traversal is not possible on bundle name") {
     val url = "somewhere?!flash=notice~../properties/messages~user.saved~:Edwin"
     val req = HttpRequest(uri = url)
-    val Seq(decoded) = flashMessages(req)('notice)
+    val ctx = WebContext.from(req)
+    val Seq(decoded) = ctx.flashNotices
     intercept[NoSuchFileException] {
       Await.result(decoded.toNodeSeq, 3.seconds)
     }

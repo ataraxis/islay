@@ -1,16 +1,19 @@
 package islay.example.pages
 
-import islay.example.TemplateProcessorModule
+import scala.xml.Unparsed
+
+import islay.example.{ExecutorModule, TemplateProcessorModule}
 import islay.transform._
 import islay.web.{Error, FieldError, Message, Page}
 import islay.web.Directives
+import spray.routing.Directive.pimpApply
 import spray.routing.Route
-import scala.xml.PCData
-import scala.xml.Unparsed
 
 
 trait FeedbackSnippetModule {
-  dependsOn: TemplateProcessorModule =>
+  dependsOn:
+    TemplateProcessorModule with
+    ExecutorModule =>
 
   import Directives._
 

@@ -11,6 +11,11 @@ object WebSettings {
 
   val reloadResources: Boolean = config.getBoolean("reload-resources")
 
+  val secretPath: String = config.getString("authenticator.secret-path")
+  val hmacAlgorithm: String = config.getString("authenticator.hmac-algorithm")
+  val idleTimeoutMs: Long = config.getMilliseconds("authenticator.idle-timeout")
+  val absoluteTimeoutMs: Long = config.getMilliseconds("authenticator.absolute-timeout")
+
   val secretKey: Array[Byte] = secretPath match {
     case null | "" =>
       val a = new Array[Byte](20)
@@ -19,9 +24,4 @@ object WebSettings {
     case _ =>
       Files.readAllBytes(Paths.get(secretPath))
   }
-
-  val secretPath: String = config.getString("authenticator.secret-path")
-  val hmacAlgorithm: String = config.getString("authenticator.hmac-algorithm")
-  val idleTimeoutMs: Long = config.getMilliseconds("authenticator.idle-timeout")
-  val absoluteTimeoutMs: Long = config.getMilliseconds("authenticator.absolute-timeout")
 }

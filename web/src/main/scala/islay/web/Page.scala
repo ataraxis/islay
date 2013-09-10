@@ -8,5 +8,6 @@ import spray.http.HttpHeaders.`Accept-Language`
 
 abstract class Page(override implicit val processor: TemplateProcessor) extends TemplateBinding {
 
-  implicit val locales: Seq[Locale] = Locales.from(request)
+  implicit val context: WebContext = WebContext.from(request)
+  implicit val locales: Seq[Locale] = context.locales
 }

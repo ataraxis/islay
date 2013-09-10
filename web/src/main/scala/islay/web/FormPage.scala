@@ -1,9 +1,9 @@
 package islay.web
 
+import scala.util.{Failure, Success}
+
 import spray.http.HttpMethods
 import spray.routing.RequestContext
-import scala.util.Success
-import scala.util.Failure
 
 
 trait FormPage extends Page {
@@ -28,7 +28,7 @@ trait FormPage extends Page {
         route.apply(context)
       case Success(Left(errors)) =>
         val ctx = context.withRequestMapped { request =>
-          WebHeaders.addMessages(request, 'error, errors)
+          WebContext.from(request).addMessages('error, errors).withinRequest
         }
         super.complete(ctx)
     }

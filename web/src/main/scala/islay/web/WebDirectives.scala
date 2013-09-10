@@ -1,17 +1,16 @@
 package islay.web
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.ExecutionContext
+import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
-import WebHeaders._
+import WebHeaders.Refresh
 import akka.actor._
 import akka.spray.UnregisteredActorRef
-import islay.template.TemplateDirectives
 import islay.transform.CallingThreadExecutor
-import shapeless._
-import spray.http.{ChunkedResponseStart, Confirmed, HttpResponse, Uri}
+import spray.http.{ChunkedResponseStart, Confirmed, HttpHeaders, HttpResponse, Uri}
 import spray.routing.{Directive0, Directive1, RequestContext}
-import spray.routing.Directive
+import spray.routing.Directive.SingleValueModifiers
 import spray.routing.directives._
 
 
@@ -20,8 +19,6 @@ trait WebDirectives {
   import MiscDirectives._
   import PathDirectives._
   import RespondWithDirectives._
-  import TemplateDirectives._
-  import WebHeaders._
 
   /**
    * Adds a `Refresh` header to the response with a timeout of 0 and the given URI.
@@ -61,8 +58,28 @@ trait WebDirectives {
     import CallingThreadExecutor.Implicit
     mapRequestContext { ctx =>
       withHttpResponseMappedFuture(ctx) { response =>
-        WebHeaders.addFlashMessage(response, level, content)
+        addFlashMessage(response, level, content)
       }
+    }
+  }
+
+  private[web] def addFlashMessage(response: HttpResponse, level: Symbol, content: Message): Future[HttpResponse] = {
+    import CallingThreadExecutor.Implicit
+    val newHeaders = response.headers map {
+      case Refresh(timeout, url) =>
+        flashUrl(url, level, content) map { url => Refresh(timeout, url) }
+      case HttpHeaders.Location(url) =>
+        flashUrl(url, level, content) map { url => HttpHeaders.Location(url) }
+      case other =>
+        Future.successful(other)
+    }
+    Future.sequence(newHeaders).map(response.withHeaders)
+  }
+
+  private def flashUrl(url: Uri, level: Symbol, content: Message) = {
+    import CallingThreadExecutor.Implicit
+    content.serialize(level) map { content =>
+      url.copy(query = Uri.Query.Cons("!flash", content, url.query))
     }
   }
 
@@ -89,9 +106,23 @@ trait WebDirectives {
       }
     }
 
+  def webContext: Directive1[WebContext] = extract { ctx =>
+    WebContext.from(ctx.request)
+  }
 
-  def requestAttr[T](name: String): Directive[Option[T] :: HNil] = ???
-  def requestAttr(name: String, value: Any): Directive0 = ???
+  def mapWebContext(f: WebContext => WebContext): Directive0 =
+    mapRequest { req =>
+      val wc = WebContext.from(req)
+      f(wc).withinRequest
+    }
+
+  def attribute(name: String): Directive1[Option[Any]] =
+    webContext map { _.attributes.get(name) }
+
+  def attribute(name: String, value: Any): Directive0 =
+    mapWebContext { ctx =>
+      ctx.copy(attributes = ctx.attributes + (name -> value))
+    }
 
 
   /**
@@ -112,24 +143,34 @@ trait WebDirectives {
   /**
    * Adds the given message to request scope at the specified level. Level is an arbitrary marker
    * with whatever semantics you give it.
+   *
+   * Note that "request scope" applies to all routes and templates under this directive. It does
+   * not apply to parallel routes/templates that are processed later. For example, if a message is
+   * added in the route for an include, that message will not be visible to another include that
+   * occurs later within the same template. However, a message added in the top-level route of a
+   * request will be visible to all includes in the rendered template.
    */
   def message(level: Symbol, msg: Message): Directive0 = messages(level, List(msg))
 
   /**
    * Adds the given messages to request scope at the specified level. Level is an arbitrary marker
    * with whatever semantics you give it.
+   *
+   * Note that "request scope" applies to all routes and templates under this directive. It does
+   * not apply to parallel routes/templates that are processed later. For example, if a message is
+   * added in the route for an include, that message will not be visible to another include that
+   * occurs later within the same template. However, a message added in the top-level route of a
+   * request will be visible to all includes in the rendered template.
    */
-  def messages(level: Symbol, msgs: Seq[Message]): Directive0 = mapRequest { addMessages(_, level, msgs) }
+  def messages(level: Symbol, msgs: Seq[Message]): Directive0 =
+    mapWebContext { _.addMessages(level, msgs) }
 
   /**
    * Extracts validation errors for a field identified by the given name (the name attribute on the
    * form element).
    */
-  def error(name: String): Directive1[Seq[Message]] = extract { ctx =>
-    requestMessages(ctx.request).getOrElse('error, Nil) collect {
-      case m: FieldError if m.fieldName == name => m
-    }
-  }
+  def error(name: String): Directive1[Seq[Message]] =
+    webContext map { _.error(name) }
 
   /**
    * Extracts all ''error'' level messages from request scope.
@@ -150,15 +191,16 @@ trait WebDirectives {
    * Extracts all messages at the given level from request scope.
    */
   def messages(level: Symbol): Directive1[Seq[Message]] =
-    originalRequest map { req =>
-      WebHeaders.messages(req).getOrElse(level, Nil)
-    }
+    webContext map { _.messages(level) }
 
   /**
    * Extracts all messages, grouped by level, from request scope.
    */
-  def allMessages: Directive1[Map[Symbol, Seq[Message]]] =
-    originalRequest.map(WebHeaders.messages)
+  def allMessages: Directive1[Map[Symbol, Seq[Message]]] = {
+    /* XXX: taking ExecutionContext as implicit param causes weirdness with directives */
+    import ExecutionContext.Implicits.global
+    webContext map { _.allMessages }
+  }
 }
 
 object WebDirectives extends WebDirectives
